@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "note": "Non-clinical, evidence-informed coping and CBT-style micro-actions for a burnout check-in coach. No diagnosis, no clinical labels, no crisis methods. Levels: green=tracking well, yellow=early strain, red=heavy load, any=fits any level.",
+  "snippets": [
+    {
+      "id": "burnout-01",
+      "tags": ["burnout", "overwhelm"],
+      "level": "yellow",
+      "text": "Pick the single most important task for the next hour and let everything else wait. One clear thing beats five half-started ones."
+    },
+    {
+      "id": "burnout-02",
+      "tags": ["burnout", "low_energy"],
+      "level": "red",
+      "text": "If you can, close the laptop for the rest of today. Rest is part of the work, not a reward you have to earn first."
+    },
+    {
+      "id": "burnout-03",
+      "tags": ["burnout", "overwhelm"],
+      "level": "any",
+      "text": "Write down the three things draining you most right now. Naming them shrinks them from a fog into a list you can actually act on."
+    },
+    {
+      "id": "burnout-04",
+      "tags": ["burnout"],
+      "level": "green",
+      "text": "You're holding steady. Protect one small window today that's just for you, before something else fills it."
+    },
+    {
+      "id": "burnout-05",
+      "tags": ["burnout", "low_energy"],
+      "level": "yellow",
+      "text": "Trade one meeting or task today for a 20-minute walk. Moving your body often resets your head faster than pushing through does."
+    },
+    {
+      "id": "burnout-06",
+      "tags": ["burnout", "social_withdrawal"],
+      "level": "red",
+      "text": "Send one message to a person you trust and tell them you're running low. You don't need the right words, just an honest one."
+    },
+    {
+      "id": "burnout-07",
+      "tags": ["burnout", "overwhelm"],
+      "level": "yellow",
+      "text": "Ask yourself what would still matter in a week. Spend your best energy there and let the rest be good enough."
+    },
+    {
+      "id": "sleep-01",
+      "tags": ["sleep", "low_energy"],
+      "level": "any",
+      "text": "Tonight, put your phone across the room before bed. A few feet of distance makes the scroll harder and sleep easier."
+    },
+    {
+      "id": "sleep-02",
+      "tags": ["sleep", "rumination"],
+      "level": "yellow",
+      "text": "If your mind races at night, keep a notepad by the bed and write the thought down. Parking it on paper tells your brain it's safe to let go."
+    },
+    {
+      "id": "sleep-03",
+      "tags": ["sleep"],
+      "level": "green",
+      "text": "Try dimming the lights an hour before bed tonight. Cooler, softer light is a quiet signal to your body that the day is winding down."
+    },
+    {
+      "id": "sleep-04",
+      "tags": ["sleep", "low_energy"],
+      "level": "red",
+      "text": "Aim to be in bed 30 minutes earlier tonight, even if you don't sleep right away. Lying still in the dark still gives your system a break."
+    },
+    {
+      "id": "sleep-05",
+      "tags": ["sleep", "anxiety"],
+      "level": "yellow",
+      "text": "If you wake at 3am, resist checking the time or your phone. Slow your breathing out longer than you breathe in, and let the night carry you."
+    },
+    {
+      "id": "sleep-06",
+      "tags": ["sleep", "focus"],
+      "level": "any",
+      "text": "Keep your wake-up time steady, even after a rough night. A consistent morning anchor does more for energy than a long lie-in."
+    },
+    {
+      "id": "focus-01",
+      "tags": ["focus", "overwhelm"],
+      "level": "yellow",
+      "text": "Set a timer for 25 minutes on one task and silence notifications. When it rings, you're allowed to stop. Starting is the hard part, not finishing."
+    },
+    {
+      "id": "focus-02",
+      "tags": ["focus"],
+      "level": "green",
+      "text": "Before you dive in, jot the one outcome you want from this work block. A clear target keeps your attention from drifting."
+    },
+    {
+      "id": "focus-03",
+      "tags": ["focus", "low_energy"],
+      "level": "yellow",
+      "text": "If you can't focus, do the smallest possible version of the task first. A two-minute start often unsticks the whole thing."
+    },
+    {
+      "id": "focus-04",
+      "tags": ["focus", "overwhelm"],
+      "level": "red",
+      "text": "When your brain feels too full to think, stop and empty it onto paper for five minutes. You can't focus through fog you haven't cleared."
+    },
+    {
+      "id": "focus-05",
+      "tags": ["focus"],
+      "level": "any",
+      "text": "Close the tabs you're not using right now. A cluttered screen quietly pulls at attention you'd rather spend elsewhere."
+    },
+    {
+      "id": "focus-06",
+      "tags": ["focus", "rumination"],
+      "level": "yellow",
+      "text": "If the same worry keeps interrupting you, schedule 10 minutes to think about it later today. Then gently return to the task in front of you."
+    },
+    {
+      "id": "anxiety-01",
+      "tags": ["anxiety"],
+      "level": "yellow",
+      "text": "Try a slow breath: in for four counts, out for six. A longer exhale tells your nervous system the alarm can quiet down."
+    },
+    {
+      "id": "anxiety-02",
+      "tags": ["anxiety", "overwhelm"],
+      "level": "red",
+      "text": "Name five things you can see and three you can hear right now. Grounding in the room helps when your thoughts are racing ahead of you."
+    },
+    {
+      "id": "anxiety-03",
+      "tags": ["anxiety", "rumination"],
+      "level": "yellow",
+      "text": "Ask whether the worry is something you can act on or only something you can fear. If you can act, take one small step; if not, set it down for now."
+    },
+    {
+      "id": "anxiety-04",
+      "tags": ["anxiety"],
+      "level": "green",
+      "text": "Feeling a little keyed up is normal. A few minutes of slow breathing or a short stretch can keep it from building."
+    },
+    {
+      "id": "anxiety-05",
+      "tags": ["anxiety", "social_withdrawal"],
+      "level": "yellow",
+      "text": "If reaching out feels heavy, start with a small message to one safe person. Connection eases anxiety more reliably than waiting it out alone."
+    },
+    {
+      "id": "anxiety-06",
+      "tags": ["anxiety", "rumination"],
+      "level": "any",
+      "text": "Notice the story your mind is telling, then ask what a kind friend would say back. Speaking to yourself gently is a skill, not a weakness."
+    },
+    {
+      "id": "anxiety-07",
+      "tags": ["anxiety", "focus"],
+      "level": "yellow",
+      "text": "Put both feet flat on the floor and feel the chair holding you. Sometimes the fastest way out of your head is back into your body."
+    },
+    {
+      "id": "low-energy-01",
+      "tags": ["low_energy"],
+      "level": "yellow",
+      "text": "Drink a full glass of water and step into daylight for a few minutes. Mild dehydration and dim rooms quietly sap energy you didn't know you were losing."
+    },
+    {
+      "id": "low-energy-02",
+      "tags": ["low_energy", "burnout"],
+      "level": "red",
+      "text": "Lower the bar for today on purpose. Doing the essentials and resting is a complete day when your tank is this low."
+    },
+    {
+      "id": "low-energy-03",
+      "tags": ["low_energy", "focus"],
+      "level": "yellow",
+      "text": "Match the task to your energy: save the hard thinking for your sharpest hour and give the dull tasks to the slow ones."
+    },
+    {
+      "id": "low-energy-04",
+      "tags": ["low_energy"],
+      "level": "green",
+      "text": "A short burst of movement, even two minutes of stretching, can lift a flat afternoon more than another coffee will."
+    },
+    {
+      "id": "low-energy-05",
+      "tags": ["low_energy", "sleep"],
+      "level": "yellow",
+      "text": "If you keep hitting an afternoon wall, a 15-minute rest with your eyes closed can be more restoring than pushing through it."
+    },
+    {
+      "id": "low-energy-06",
+      "tags": ["low_energy"],
+      "level": "any",
+      "text": "Eat something with a little protein if it's been a while. Steady fuel keeps your mood and focus from dipping with your blood sugar."
+    },
+    {
+      "id": "overwhelm-01",
+      "tags": ["overwhelm"],
+      "level": "yellow",
+      "text": "Break the thing that feels huge into the very next physical step. You don't have to see the whole staircase to take one stair."
+    },
+    {
+      "id": "overwhelm-02",
+      "tags": ["overwhelm", "burnout"],
+      "level": "red",
+      "text": "Choose one thing to drop or delay today and let it go without guilt. Protecting your limits is how you keep showing up at all."
+    },
+    {
+      "id": "overwhelm-03",
+      "tags": ["overwhelm", "focus"],
+      "level": "yellow",
+      "text": "Try a brain dump: list everything on your mind, then circle just one to start. Getting it out of your head frees up room to think."
+    },
+    {
+      "id": "overwhelm-04",
+      "tags": ["overwhelm"],
+      "level": "green",
+      "text": "Things feel manageable right now. A quick five-minute plan for tomorrow will keep it that way and ease the morning rush."
+    },
+    {
+      "id": "overwhelm-05",
+      "tags": ["overwhelm", "social_withdrawal"],
+      "level": "yellow",
+      "text": "If your plate is overflowing, ask one person for help with one thing. Sharing the load is a strength, not an admission."
+    },
+    {
+      "id": "overwhelm-06",
+      "tags": ["overwhelm", "anxiety"],
+      "level": "red",
+      "text": "When everything feels urgent, pause and ask what truly can't wait until tomorrow. Usually it's far less than it feels in the moment."
+    },
+    {
+      "id": "social-01",
+      "tags": ["social_withdrawal"],
+      "level": "yellow",
+      "text": "Reach out to one person today, even just a short hello. Connection often feels hardest right when it would help the most."
+    },
+    {
+      "id": "social-02",
+      "tags": ["social_withdrawal", "burnout"],
+      "level": "red",
+      "text": "Tell someone you trust that you're pulling back and don't quite know why. You don't have to explain it perfectly to be heard."
+    },
+    {
+      "id": "social-03",
+      "tags": ["social_withdrawal", "low_energy"],
+      "level": "yellow",
+      "text": "Plan one low-effort bit of company this week, like a walk or a quiet coffee. Small contact counts when big plans feel like too much."
+    },
+    {
+      "id": "social-04",
+      "tags": ["social_withdrawal"],
+      "level": "green",
+      "text": "You're doing okay. Keep one regular point of contact on the calendar so connection doesn't slip away when you get busy."
+    },
+    {
+      "id": "social-05",
+      "tags": ["social_withdrawal", "rumination"],
+      "level": "yellow",
+      "text": "If you've been assuming people are annoyed with you, check the evidence rather than the fear. Your mind tends to fill silence with the worst story."
+    },
+    {
+      "id": "rumination-01",
+      "tags": ["rumination"],
+      "level": "yellow",
+      "text": "When a thought loops, name it out loud: 'I'm replaying this again.' Catching the loop is the first step to stepping out of it."
+    },
+    {
+      "id": "rumination-02",
+      "tags": ["rumination", "anxiety"],
+      "level": "yellow",
+      "text": "Shift from 'why is this happening' to 'what's one small thing I can do next.' Action quiets a spinning mind better than analysis does."
+    },
+    {
+      "id": "rumination-03",
+      "tags": ["rumination", "focus"],
+      "level": "any",
+      "text": "Give the worry a 10-minute window later, then redirect now. Telling your mind 'not yet, but soon' loosens its grip without ignoring it."
+    },
+    {
+      "id": "rumination-04",
+      "tags": ["rumination", "sleep"],
+      "level": "red",
+      "text": "If a heavy thought won't quiet down tonight, write it out and add one kind line you'd tell a friend in the same spot."
+    },
+    {
+      "id": "rumination-05",
+      "tags": ["rumination"],
+      "level": "green",
+      "text": "A little overthinking is human. A short walk or a change of room can break a mild loop before it settles in."
+    },
+    {
+      "id": "general-01",
+      "tags": ["burnout", "anxiety", "overwhelm"],
+      "level": "any",
+      "text": "Take one slow breath before you decide your next move. A single pause can change a reaction into a choice."
+    },
+    {
+      "id": "general-02",
+      "tags": ["low_energy", "focus", "burnout"],
+      "level": "any",
+      "text": "Step away from the screen for five minutes and look at something far away. Short, regular breaks keep you steadier than long ones forced by a crash."
+    },
+    {
+      "id": "general-03",
+      "tags": ["burnout", "overwhelm", "social_withdrawal"],
+      "level": "red",
+      "text": "Be gentle with yourself today; you're carrying a lot. Pick one kind thing to do for yourself and let that be enough."
+    },
+    {
+      "id": "general-04",
+      "tags": ["focus", "anxiety", "rumination"],
+      "level": "green",
+      "text": "You're in a good spot to build a small habit. Choose one tiny daily anchor, like a morning glass of water, and let it carry you on harder days."
+    }
+  ]
+}

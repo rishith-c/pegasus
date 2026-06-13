@@ -17,6 +17,17 @@ CHAT_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 
 _POSITIVE_EMOTIONS = {"joy", "neutral", "surprise"}
 
+_rag_engine = None  # lazy RagInterventionEngine singleton
+
+
+def _rag():
+    global _rag_engine
+    if _rag_engine is None:
+        from rag_intervention import RagInterventionEngine
+
+        _rag_engine = RagInterventionEngine()
+    return _rag_engine
+
 
 class BurnoutScorer:
     def __init__(self) -> None:
@@ -57,14 +68,37 @@ class BurnoutScorer:
         wpm = float(signals.get("typing_wpm", 60))
         rt = float(signals.get("response_time_ms", 3000))
 
+        # Behavioral burnout sub-scores (0-100; higher = more burnout signal).
+        imsg = (1 - sentiment) * 100
+        typing = (
+            min(error_rate / 20, 1) * 0.40
+            + (1 - min(wpm / 80, 1)) * 0.35
+            + min(rt / 10000, 1) * 0.25
+        ) * 100
+        facial = float(signals.get("facial_score") or signals.get("facial_stress_score") or 0)
+        voice = float(signals.get("voice_score") or signals.get("voice_stress_score") or 0)
+
+        # TRIBE deviation = how far behavior sits BELOW the healthy baseline
+        # (directional — matching a low baseline isn't burnout; only a shortfall is).
         actual = (
             sentiment * 0.3
             + (1 - min(error_rate / 20, 1)) * 0.2
             + min(wpm / 80, 1) * 0.2
             + (1 - min(rt / 10000, 1)) * 0.3
         )
-        deviation = abs(expected - actual)
-        score = min(int(deviation * 150), 100)
+        deviation = max(0.0, expected - actual)
+        tribe = min(deviation * 100, 100)
+
+        # PRD §4.5 weighted fusion, renormalized over the streams present
+        # (a text-only check-in has no facial/voice).
+        weights = {"imessage": 0.25, "typing": 0.20, "facial": 0.30, "voice": 0.15, "tribe": 0.10}
+        subs = {"imessage": imsg, "typing": typing, "tribe": tribe}
+        if facial > 0:
+            subs["facial"] = facial
+        if voice > 0:
+            subs["voice"] = voice
+        total_w = sum(weights[k] for k in subs)
+        score = min(int(round(sum(subs[k] * weights[k] for k in subs) / total_w)), 100)
         level = "green" if score < 30 else "yellow" if score < 65 else "red"
 
         ind: List[str] = []
@@ -87,13 +121,13 @@ class BurnoutScorer:
             "top_indicators": ind[:3],
             "intervention": self._intervene(score, level, ind),
             "brain_regions_flagged": self._flag_regions(regions),
-            "confidence": round(min(0.5 + deviation * 0.5, 0.95), 3),
+            "confidence": round(min(0.55 + deviation * 0.4, 0.95), 3),
             "breakdown": {
-                "imessage": int((1 - sentiment) * 100),
-                "typing": int(min(error_rate / 20, 1) * 100),
-                "facial": int(signals.get("facial_score") or signals.get("facial_stress_score") or 0),
-                "voice": int(signals.get("voice_score") or signals.get("voice_stress_score") or 0),
-                "tribe": int(deviation * 100),
+                "imessage": int(imsg),
+                "typing": int(typing),
+                "facial": int(facial),
+                "voice": int(voice),
+                "tribe": int(tribe),
             },
         }
 
@@ -107,7 +141,13 @@ class BurnoutScorer:
         return [labels[k] for k, v in regions.items() if k in labels and float(v) > 0.6]
 
     def _intervene(self, score: int, level: str, indicators: List[str]) -> str:
-        """One warm, specific action via a HF chat model. Canned fallback."""
+        """One warm, specific action. RAG first, then HF chat, then canned fallback."""
+        try:
+            suggestion = _rag().suggest(score, level, indicators)
+            if suggestion:
+                return suggestion
+        except Exception:
+            pass
         if not HF_TOKEN:
             return self._fallback(level)
         try:

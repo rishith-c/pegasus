@@ -1,27 +1,43 @@
-// PLACEHOLDER — bootstrapped by Rishith so the Expo app runs and the data layer
-// (src/services, src/hooks, src/types) is importable.
-//
-// WESLEY owns this file and everything under src/screens, src/components,
-// src/navigation, src/utils. Replace this with the real App + TabNavigator.
+// Pegasus app root. Owned by Wesley (visual layer).
+// Wires the dark navigation theme, gesture handler, and safe-area providers
+// around the bottom tab navigator. Screens live under src/screens.
+import "react-native-gesture-handler";
+import React from "react";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  NavigationContainer,
+  DarkTheme,
+  Theme,
+} from "@react-navigation/native";
+
+import TabNavigator from "./src/navigation/TabNavigator";
+import { COLORS } from "./src/utils/colors";
+
+const navTheme: Theme = {
+  ...DarkTheme,
+  dark: true,
+  colors: {
+    ...DarkTheme.colors,
+    primary: COLORS.green,
+    background: COLORS.bg,
+    card: COLORS.card,
+    text: COLORS.text,
+    border: COLORS.border,
+    notification: COLORS.red,
+  },
+};
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>PEGASUS</Text>
-      <Text style={styles.sub}>your mind's check engine light</Text>
-      <Text style={styles.note}>
-        Data layer ready in src/. Wesley builds screens here.
-      </Text>
-      <StatusBar style="light" />
-    </View>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: COLORS.bg }}>
+      <SafeAreaProvider>
+        <NavigationContainer theme={navTheme}>
+          <TabNavigator />
+        </NavigationContainer>
+        <StatusBar style="light" />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0a", alignItems: "center", justifyContent: "center", padding: 24 },
-  title: { color: "#ffffff", fontSize: 44, fontWeight: "800", letterSpacing: 3 },
-  sub: { color: "#9ca3af", marginTop: 6, fontSize: 16 },
-  note: { color: "#4b5563", marginTop: 28, fontSize: 13, textAlign: "center" },
-});

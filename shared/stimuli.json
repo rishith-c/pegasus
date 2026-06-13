@@ -7,6 +7,12 @@
     { "id": "audio_01", "type": "audio", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", "category": "calm", "prompt": "Listen for a few seconds. Notice what shifts in you, then describe it." },
     { "id": "question_01", "type": "text", "url": "", "category": "neutral", "prompt": "What's one thing on your mind right now?" },
     { "id": "question_02", "type": "text", "url": "", "category": "neutral", "prompt": "How would you describe your energy today, in a sentence?" },
-    { "id": "activating_01", "type": "text", "url": "", "category": "activating", "prompt": "Your deadline just moved up by a week. React honestly — what's your first thought?" }
+    { "id": "activating_01", "type": "text", "url": "", "category": "activating", "prompt": "Your deadline just moved up by a week. React honestly — what's your first thought?" },
+    { "id": "img_calm_01", "type": "image", "url": "https://images.unsplash.com/photo-1470770841072-f978cf4d019e", "category": "calm", "prompt": "A still lake at dawn. What does your body notice as you look?" },
+    { "id": "img_calm_02", "type": "image", "url": "https://images.unsplash.com/photo-1500964757637-c85e8a162699", "category": "calm", "prompt": "Soft morning light over the hills. Where does your attention settle?" },
+    { "id": "img_calm_03", "type": "image", "url": "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d", "category": "calm", "prompt": "Quiet light filtering through the trees. What's the first word that comes to mind?" },
+    { "id": "img_activating_01", "type": "image", "url": "https://images.unsplash.com/photo-1494522855154-9297ac14b55f", "category": "activating", "prompt": "A crowded, rushing crossing. What jumps out at you first?" },
+    { "id": "img_activating_02", "type": "image", "url": "https://images.unsplash.com/photo-1519501025264-65ba15a82390", "category": "activating", "prompt": "Bright city lights at night. Notice what your eyes lock onto." },
+    { "id": "img_activating_03", "type": "image", "url": "https://images.unsplash.com/photo-1534447677768-be436bb09401", "category": "activating", "prompt": "A storm building over the horizon. What does this scene pull from you?" }
   ]
 }
