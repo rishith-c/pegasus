@@ -4,8 +4,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config import DATABASE_URL
 
-# check_same_thread is a SQLite-only quirk; harmless to compute generally.
-_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+# check_same_thread is a SQLite-only quirk; timeout sets the busy-wait so
+# concurrent app + SMS writes wait instead of erroring with "database is locked".
+_connect_args = {"check_same_thread": False, "timeout": 30} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
