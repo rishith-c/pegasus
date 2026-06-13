@@ -26,14 +26,16 @@ baseline = Tribe().get_baseline.remote(stimulus_id)
 
 ## Files
 - `main.py` — FastAPI + Modal TRIBE client.
-- `scoring.py` — `BurnoutScorer`: HF emotion model (`hf_sentiment`) +
-  deviation math (`compute_deviation`) + Claude intervention (`_intervene`).
+- `scoring.py` — `BurnoutScorer`, **Hugging Face only (no Anthropic)**: HF
+  emotion model (`hf_sentiment`) + deviation math (`compute_deviation`) + HF
+  chat-model intervention (`_intervene`, via `huggingface_hub.InferenceClient`).
   Returns `BurnoutResult` (score, level, tribe/behavioral deviation, indicators,
   intervention, brain_regions_flagged, confidence, breakdown).
 
 ## Secrets (.env, gitignored)
-`HF_TOKEN`, `ANTHROPIC_API_KEY`. Modal auth via `modal token new`. Read with
-`os.getenv`. Levels: green <30, yellow <65, red ≥65.
+`HF_TOKEN` (used for BOTH sentiment + interventions). Optional `HF_MODEL`,
+`HF_EMOTION_MODEL`. Modal auth via `modal token new`. Read with `os.getenv`.
+Levels: green <30, yellow <65, red ≥65.
 
 ## Run
 ```bash

@@ -3,8 +3,9 @@
 Analyzes a 30-60s check-in clip:
 - **Facial** — my own stress heuristics on MediaPipe Face Mesh landmarks
   (EAR-style eye openness, inner-brow gap, lip compression, jaw width). No CV API.
-- **Voice** — NVIDIA STT transcript + librosa pitch / tremor / speaking rate.
-- **TTS** (bonus) — NVIDIA TTS speaks the intervention aloud (`tts.py`).
+- **Voice** — NVIDIA **parakeet ASR** (hosted Riva gRPC) transcript + librosa
+  pitch / tremor / speaking rate.
+- **TTS** — NVIDIA **Chatterbox** (hosted Riva gRPC) speaks the intervention (`tts.py`).
 
 Returns `{ facial, voice, combined_score }`. The backend forwards the user's
 clip here, then feeds the result into `/ml`'s scorer.

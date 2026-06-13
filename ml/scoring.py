@@ -1,24 +1,33 @@
 """Burnout scoring: deviation of behavior from the TRIBE healthy baseline.
 
-Language understanding via Hugging Face (fast emotion model, cross-checks the
-sentiment that Dhruva's signals service also computes); intervention via Claude.
-Both degrade gracefully (HF -> 0.5, Claude -> canned) so the demo runs offline.
+All language/AI is **Hugging Face** (no Anthropic):
+  - sentiment/emotion via a HF text-classification model
+  - interventions via a HF chat (instruct) model
+Both degrade gracefully (sentiment -> 0.5, intervention -> canned copy) so the
+demo runs even if HF is unreachable.
 """
 from __future__ import annotations
 
 import os
 from typing import Dict, List, Optional
 
-import requests
-
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_API = "https://api-inference.huggingface.co/models"
-EMOTION_MODEL = "j-hartmann/emotion-english-distilroberta-base"
+EMOTION_MODEL = os.getenv("HF_EMOTION_MODEL", "j-hartmann/emotion-english-distilroberta-base")
+CHAT_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+
+_POSITIVE_EMOTIONS = {"joy", "neutral", "surprise"}
 
 
 class BurnoutScorer:
     def __init__(self) -> None:
-        self._anthropic = None  # lazy
+        self._client = None  # lazy huggingface_hub.InferenceClient
+
+    def _hf(self):
+        if self._client is None:
+            from huggingface_hub import InferenceClient
+
+            self._client = InferenceClient(token=HF_TOKEN)
+        return self._client
 
     # --- language ----------------------------------------------------------
     def hf_sentiment(self, text: str) -> float:
@@ -26,16 +35,10 @@ class BurnoutScorer:
         if not text or not HF_TOKEN:
             return 0.5
         try:
-            r = requests.post(
-                f"{HF_API}/{EMOTION_MODEL}",
-                headers={"Authorization": f"Bearer {HF_TOKEN}"},
-                json={"inputs": text},
-                timeout=10,
-            )
-            results = r.json()
-            scores = results[0] if isinstance(results, list) and results and isinstance(results[0], list) else results
-            pos = sum(e["score"] for e in scores if e["label"] in ("joy", "neutral", "surprise"))
-            return min(max(pos, 0.0), 1.0)
+            results = self._hf().text_classification(text, model=EMOTION_MODEL)
+            # results: list of {label, score} across all emotions.
+            pos = sum(r.score for r in results if r.label.lower() in _POSITIVE_EMOTIONS)
+            return min(max(float(pos), 0.0), 1.0)
         except Exception:
             return 0.5
 
@@ -45,7 +48,6 @@ class BurnoutScorer:
         regions = baseline.get("regions", {}) or {}
         expected = float(regions.get("prefrontal_cortex", 0.5))
 
-        # Prefer a passed sentiment; otherwise compute from the response text.
         sentiment = signals.get("sentiment_score")
         if sentiment is None:
             sentiment = self.hf_sentiment(signals.get("response_text", ""))
@@ -97,7 +99,6 @@ class BurnoutScorer:
 
     @staticmethod
     def _flag_regions(regions: Dict) -> List[str]:
-        """Plain-English flags for brain regions above a load threshold."""
         labels = {
             "prefrontal_cortex": "Prefrontal cortex: elevated cognitive load",
             "amygdala_region": "Amygdala: heightened stress response",
@@ -106,23 +107,32 @@ class BurnoutScorer:
         return [labels[k] for k, v in regions.items() if k in labels and float(v) > 0.6]
 
     def _intervene(self, score: int, level: str, indicators: List[str]) -> str:
+        """One warm, specific action via a HF chat model. Canned fallback."""
+        if not HF_TOKEN:
+            return self._fallback(level)
         try:
-            if self._anthropic is None:
-                from anthropic import Anthropic
-
-                self._anthropic = Anthropic()
-            r = self._anthropic.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=150,
+            resp = self._hf().chat_completion(
+                model=CHAT_MODEL,
+                max_tokens=120,
+                temperature=0.7,
                 messages=[{
                     "role": "user",
                     "content": (
                         f"Burnout {score}/100 ({level}). Signs: {', '.join(indicators)}. "
                         "Give ONE specific action in under 2 sentences. Warm but direct. "
-                        "You are a check engine light, not a therapist."
+                        "You are a check engine light, not a therapist. No preamble."
                     ),
                 }],
             )
-            return r.content[0].text
+            text = resp.choices[0].message.content.strip()
+            return text or self._fallback(level)
         except Exception:
-            return "Take a 10-minute break and step outside for some fresh air."
+            return self._fallback(level)
+
+    @staticmethod
+    def _fallback(level: str) -> str:
+        return {
+            "green": "You're tracking well. Take a real 5-minute break before your next task.",
+            "yellow": "Step outside for 10 minutes and drink water before you continue.",
+            "red": "Stop work for today if you can, and message one person you trust right now.",
+        }.get(level, "Take a 10-minute break and step outside for some fresh air.")

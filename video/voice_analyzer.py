@@ -1,16 +1,15 @@
-# Voice stress (Rishith). NVIDIA STT for transcript, librosa for acoustics.
-# Degrades gracefully (empty transcript / zeros) so a check-in never hard-fails.
+# Voice stress (Rishith). NVIDIA parakeet ASR (hosted Riva gRPC) for the
+# transcript + librosa for acoustic stress. Degrades gracefully (empty
+# transcript / zeros) so a check-in never hard-fails.
 import os
 
 import librosa
 import numpy as np
-import requests
 
 NVIDIA_STT_KEY = os.getenv("NVIDIA_STT_KEY")
-# Confirm the exact NIM endpoint in the NVIDIA API catalog (build.nvidia.com).
-NVIDIA_STT_URL = os.getenv(
-    "NVIDIA_STT_URL", "https://api.nvcf.nvidia.com/v1/speech/transcribe"
-)
+RIVA_SERVER = os.getenv("NVIDIA_RIVA_SERVER", "grpc.nvcf.nvidia.com:443")
+# Parakeet CTC 1.1B ASR (en-US) hosted function.
+ASR_FUNCTION_ID = os.getenv("NVIDIA_ASR_FUNCTION_ID", "1598d209-5e27-4d3c-8079-4751568b1081")
 
 
 class VoiceStressAnalyzer:
@@ -18,14 +17,29 @@ class VoiceStressAnalyzer:
         if not NVIDIA_STT_KEY:
             return ""
         try:
+            import riva.client
+
+            auth = riva.client.Auth(
+                uri=RIVA_SERVER,
+                use_ssl=True,
+                metadata_args=[
+                    ["function-id", ASR_FUNCTION_ID],
+                    ["authorization", f"Bearer {NVIDIA_STT_KEY}"],
+                ],
+            )
+            asr = riva.client.ASRService(auth)
+            config = riva.client.RecognitionConfig(
+                language_code="en-US",
+                max_alternatives=1,
+                enable_automatic_punctuation=True,
+            )
+            riva.client.add_audio_file_specs_to_config(config, audio_path)
             with open(audio_path, "rb") as f:
-                r = requests.post(
-                    NVIDIA_STT_URL,
-                    headers={"Authorization": f"Bearer {NVIDIA_STT_KEY}"},
-                    files={"audio": f},
-                    timeout=30,
-                )
-            return r.json().get("text", "")
+                data = f.read()
+            resp = asr.offline_recognize(data, config)
+            return " ".join(
+                r.alternatives[0].transcript for r in resp.results if r.alternatives
+            ).strip()
         except Exception:
             return ""
 
