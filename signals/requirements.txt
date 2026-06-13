@@ -1,4 +1,4 @@
-anthropic
+requests
 twilio
 fastapi
 uvicorn[standard]
