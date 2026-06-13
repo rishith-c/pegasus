@@ -1,7 +1,8 @@
 """HTTP client for Dhruva's signal-processing service (localhost:8002).
 
 Functions raise on transport/HTTP error; callers decide how to degrade.
-NOTE: the live alert endpoint is POST /alert and REQUIRES `phone`.
+NOTE: alerts go to POST /alert/send (no phone). Phone is registered separately
+via POST /register-phone; the signals service looks it up on send.
 """
 import httpx
 
@@ -23,15 +24,18 @@ async def get_signals(user_id: str) -> dict:
         return res.json()
 
 
-async def send_alert(user_id: str, phone: str, score, level: str, intervention: str) -> dict:
-    payload = {
-        "user_id": user_id,
-        "phone": phone,
-        "score": score,
-        "level": level,
-        "intervention": intervention,
-    }
+async def send_alert(user_id: str, score, level: str, intervention: str) -> dict:
+    payload = {"user_id": user_id, "score": score, "level": level, "intervention": intervention}
     async with httpx.AsyncClient(timeout=SERVICE_TIMEOUT) as client:
-        res = await client.post(f"{SIGNAL_SERVICE}/alert", json=payload)
+        res = await client.post(f"{SIGNAL_SERVICE}/alert/send", json=payload)
+        res.raise_for_status()
+        return res.json()
+
+
+async def register_phone(user_id: str, phone: str) -> dict:
+    """Tell the signals service which phone to text for this user."""
+    payload = {"user_id": user_id, "phone": phone}
+    async with httpx.AsyncClient(timeout=SERVICE_TIMEOUT) as client:
+        res = await client.post(f"{SIGNAL_SERVICE}/register-phone", json=payload)
         res.raise_for_status()
         return res.json()

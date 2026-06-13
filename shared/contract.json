@@ -63,9 +63,13 @@
       "POST /video/submit": "multipart (video, user_id) -> video analysis result"
     },
     "signals (8002, owner: dhruva)": {
-      "POST /analyze": "{ user_id, response_text, response_time_ms, typing_wpm, error_rate } -> { sentiment_score, energy_level, linguistic_flags, combined_signal_score, detail }",
+      "POST /analyze": "{ user_id, response_text, response_time_ms, typing_wpm, error_rate, [+optional keystroke biometrics: hesitation_count, burst_pattern, avg_key_hold_ms, flight_time_ms, correction_loops] } -> FLAT { sentiment_score, energy_level, combined_signal_score, linguistic_flags, typing_stress_score, future_tense_pct, self_referential_pct, hedging_count, flat_affect, word_count, ..., detail{sentiment,typing,temporal,linguistic} }",
       "GET /signals/{user_id}": "-> latest analyzed signals",
-      "POST /alert": "{ user_id, phone, score, level, intervention } -> { sent, message_sid }  (NOTE: live endpoint is /alert and REQUIRES phone)"
+      "GET /signals/{user_id}/history": "-> { records, record_count, avg_score, score_trend, word_count_trend }",
+      "POST /alert/send": "{ user_id, score, level, intervention } -> { sent, message_sid }  (SMS only on red; phone looked up from a prior /register-phone)",
+      "POST /register-phone": "{ user_id, phone } -> { registered }",
+      "POST /send-checkin": "{ user_id, phone } -> sends a stimulus over SMS",
+      "POST /sms/webhook": "Twilio inbound SMS webhook (Dhruva's bot)"
     },
     "ml (8003, owner: rishith)": {
       "POST /score": "{ user_id, stimulus_id, signals } -> burnout_result",

@@ -69,17 +69,16 @@ async def submit_response(data: ResponseSubmitRequest, db: Session = Depends(get
     rec = crud.save_score(db, data.user_id, data.stimulus_id, result, data.source)
 
     # 4) Red alert via signals service (best effort, never fails the request).
+    #    Signals looks up the user's registered phone; we just fire on red.
     alert = None
     if result["level"] == "red":
-        user = crud.get_user(db, data.user_id)
-        if user and user.phone:
-            try:
-                alert = await signal_client.send_alert(
-                    data.user_id, user.phone, result["score"], result["level"], result["intervention"]
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.warning("alert dispatch failed: %s", exc)
-                alert = {"sent": False, "error": str(exc)}
+        try:
+            alert = await signal_client.send_alert(
+                data.user_id, result["score"], result["level"], result["intervention"]
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("alert dispatch failed: %s", exc)
+            alert = {"sent": False, "error": str(exc)}
 
     out = rec.to_result()
     out["services"] = {"signals": signals_ok, "ml": result["source"] == "tribe"}
