@@ -1,5 +1,7 @@
-anthropic
-twilio
 fastapi
 uvicorn[standard]
+python-multipart
+httpx
+requests
+twilio
 python-dotenv
