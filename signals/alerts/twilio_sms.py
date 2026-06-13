@@ -3,30 +3,35 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# phone lookup: populated at runtime when users register via /register-phone
+USER_PHONES: dict[str, str] = {}  # user_id -> phone
 
-def send_red_alert(phone: str, user_id: str, score: float, intervention: str) -> dict:
+
+def _client():
     from twilio.rest import Client
+    sid  = os.getenv("TWILIO_ACCOUNT_SID")
+    auth = os.getenv("TWILIO_AUTH_TOKEN")
+    if not sid or not auth:
+        raise EnvironmentError("TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set in .env")
+    return Client(sid, auth)
 
-    sid = os.getenv("TWILIO_SID")
-    auth = os.getenv("TWILIO_AUTH")
-    from_number = os.getenv("TWILIO_NUMBER")
 
-    if not all([sid, auth, from_number]):
-        raise EnvironmentError("Twilio credentials missing — check TWILIO_SID, TWILIO_AUTH, TWILIO_NUMBER in .env")
+def send_sms(phone: str, body: str, media_url: str = None) -> str:
+    params = {
+        "body":   body,
+        "from_":  os.getenv("TWILIO_PHONE_NUMBER"),
+        "to":     phone,
+    }
+    if media_url:
+        params["media_url"] = [media_url]
+    msg = _client().messages.create(**params)
+    return msg.sid
 
-    with open(
-        os.path.join(os.path.dirname(__file__), "templates", "red_alert.txt"),
-        encoding="utf-8",
-    ) as f:
-        template = f.read()
 
-    body = template.format(
-        user_id=user_id,
-        score=round(score, 1),
-        intervention=intervention,
-    )
-
-    client = Client(sid, auth)
-    message = client.messages.create(body=body, from_=from_number, to=phone)
-
-    return {"sent": True, "message_sid": message.sid}
+def send_alert_sms(user_id: str, score: int, intervention: str) -> str:
+    from alerts.templates import red_alert
+    phone = USER_PHONES.get(user_id)
+    if not phone:
+        return "no_phone_on_file"
+    body = red_alert(score, intervention)
+    return send_sms(phone, body)

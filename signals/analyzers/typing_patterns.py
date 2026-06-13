@@ -1,67 +1,69 @@
-def analyze_typing(
-    typing_wpm: float,
-    error_rate: float,
-    hesitation_count: int = 0,
-    burst_pattern: str = "steady",
-    avg_key_hold_ms: float = 100,
-    flight_time_ms: float = 150,
-    correction_loops: int = 0,
-) -> dict:
+def analyze_typing(metrics: dict) -> dict:
     """
-    Interprets typing biometrics into a burnout contribution 0-25.
-    All fields except wpm and error_rate are optional (SMS / simple callers
-    won't have them; defaults represent normal healthy behavior).
+    Accepts a metrics dict (from TypingBiometrics in collector.js).
+    Returns stress_score 0-100 and flags for Jason's combined scorer.
     """
-    # WPM: below 30 = severe, 60+ = healthy
-    wpm_score = max(0.0, min(1.0, (60 - typing_wpm) / 60))
+    wpm           = metrics.get("typing_wpm", 60)
+    error_rate    = metrics.get("error_rate", 0)
+    response_time = metrics.get("response_time_ms", 3000)
+    hesitations   = metrics.get("hesitation_count", 0)
+    burst         = metrics.get("burst_pattern", "steady")
+    hold_ms       = metrics.get("avg_key_hold_ms", 100)
+    flight_ms     = metrics.get("flight_time_ms", 150)
+    corrections   = metrics.get("correction_loops", 0)
 
-    # Error rate: 0-100 (backspaces / total keystrokes %)
-    error_score = min(1.0, error_rate / 20)
+    stress = 0
+    flags  = []
 
-    # Hesitations (pauses > 3s mid-word)
-    hesitation_score = min(1.0, hesitation_count / 5)
+    if wpm < 30:
+        stress += 25; flags.append("very slow typing speed")
+    elif wpm < 45:
+        stress += 12
 
-    # Burst pattern
-    burst_score = {"steady": 0.0, "burst-pause": 0.4, "erratic": 1.0}.get(burst_pattern, 0.0)
+    if error_rate > 15:
+        stress += 25; flags.append("high error/correction rate")
+    elif error_rate > 8:
+        stress += 12
 
-    # Key hold time: 80-120ms healthy; >180ms = pressing hard (stress)
-    hold_score = min(1.0, max(0.0, (avg_key_hold_ms - 120) / 100)) if avg_key_hold_ms > 0 else 0.0
+    if response_time > 10_000:
+        stress += 20; flags.append("very delayed response")
+    elif response_time > 6_000:
+        stress += 10
 
-    # Flight time: 100-200ms healthy; >400ms = cognitive slowing
-    flight_score = min(1.0, max(0.0, (flight_time_ms - 200) / 300)) if flight_time_ms > 0 else 0.0
+    if hesitations > 3:
+        stress += 15; flags.append("frequent mid-word hesitations")
+    elif hesitations > 1:
+        stress += 7
 
-    # Correction loops (typing then deleting whole words)
-    correction_score = min(1.0, correction_loops / 3)
+    if burst == "erratic":
+        stress += 10; flags.append("erratic typing rhythm")
+    elif burst == "burst-pause":
+        stress += 5
 
-    # Weighted contribution (25 pts total)
-    contribution = (
-        wpm_score        * 0.22 +
-        error_score      * 0.18 +
-        hesitation_score * 0.15 +
-        burst_score      * 0.15 +
-        hold_score       * 0.10 +
-        flight_score     * 0.10 +
-        correction_score * 0.10
-    ) * 25
+    if hold_ms > 180:
+        stress += 5  # pressing hard — physical stress proxy
+    if flight_ms > 400:
+        stress += 5  # cognitive slowing
+    if corrections > 2:
+        stress += 5; flags.append("repeated correction loops")
 
-    # Classify overall pattern
-    if typing_wpm < 20 or burst_pattern == "erratic":
+    if wpm < 20 or burst == "erratic":
         pattern = "severely_impaired"
-    elif typing_wpm < 40 or error_rate > 15 or hesitation_count > 3:
+    elif wpm < 40 or error_rate > 15 or hesitations > 3:
         pattern = "stressed"
-    elif typing_wpm < 60 or error_rate > 8:
+    elif wpm < 60 or error_rate > 8:
         pattern = "mildly_stressed"
     else:
         pattern = "normal"
 
     return {
-        "typing_wpm":       typing_wpm,
-        "error_rate":       error_rate,
-        "hesitation_count": hesitation_count,
-        "burst_pattern":    burst_pattern,
-        "avg_key_hold_ms":  avg_key_hold_ms,
-        "flight_time_ms":   flight_time_ms,
-        "correction_loops": correction_loops,
-        "pattern":          pattern,
-        "burnout_contribution": round(min(contribution, 25), 2),
+        "stress_score":          min(stress, 100),
+        "pattern":               pattern,
+        "flags":                 flags,
+        # keep raw fields so /analyze can surface them flat
+        "typing_wpm":            wpm,
+        "error_rate":            error_rate,
+        "hesitation_count":      hesitations,
+        "burst_pattern":         burst,
+        "burnout_contribution":  min(stress * 0.25, 25),
     }
