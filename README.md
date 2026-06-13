@@ -1,5 +1,31 @@
 # pegasus
 
+A mental-health **check engine light**. A daily stimulus goes to the user →
+they respond (text + typing/timing) → **TRIBE v2** predicts how a *healthy*
+brain responds to that stimulus → we score the deviation from the user's actual
+behavioral signal → 🟢/🟡/🔴 + a Claude intervention → SMS alert if red.
+
+```
+frontend (Wesley)  React          :3000   ── talks only to backend
+backend  (Jason)   FastAPI+SQLite :8001   ── orchestrator, fans out ↓
+signals  (Dhruva)  FastAPI        :8002   ── sentiment + typing + Twilio
+ml       (Rishith) FastAPI+TRIBE  :8003   ── predict · score · intervention
+imessage (TBD)     AppleScript + chat.db   ── optional iMessage delivery (macOS)
+```
+
+## Quickstart
+
+```bash
+./dev.sh            # sets up venvs + node_modules on first run, then starts all 4
+# → http://localhost:3000
+```
+
+Optional iMessage channel (macOS only): see [`imessage/README.md`](imessage/README.md).
+
+API contract: [`shared/contract.md`](shared/contract.md). Agent rules:
+[`AGENTS.md`](AGENTS.md) (root) + one per folder. Dispatchable subagents live in
+`.claude/agents/`.
+
 ## Branching model
 
 ```

@@ -40,3 +40,8 @@ wandb/
 
 # Logs
 *.log
+
+# iMessage bridge runtime (registry.json holds phone numbers — never commit)
+imessage/.state.json
+imessage/registry.json
+imessage/*.scpt
