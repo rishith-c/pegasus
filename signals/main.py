@@ -21,8 +21,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# in-memory store: user_id -> latest signal record
+# latest signal per user
 _signals_store: dict[str, dict] = {}
+# full history per user (max 30 records each)
+_history_store: dict[str, list] = {}
+_HISTORY_LIMIT = 30
 
 
 # ── Request models ─────────────────────────────────────────────────────────────
@@ -106,12 +109,27 @@ async def analyze(req: AnalyzeRequest):
         2,
     ))
 
+    from datetime import datetime, timezone
     result = {
-        "user_id":              req.user_id,
-        "sentiment_score":      sentiment["sentiment_score"],
-        "energy_level":         sentiment["energy_level"],
-        "linguistic_flags":     sentiment["flags"] + linguistic["linguistic_flags"],
+        # ── Flat fields Jason's combined_scorer reads directly ──
+        "user_id":             req.user_id,
+        "sentiment_score":     sentiment["sentiment_score"],
+        "energy_level":        sentiment["energy_level"],
+        "response_latency_ms": req.response_time_ms,
+        "future_tense_pct":    linguistic["future_tense_pct"],
+        "self_reference_pct":  linguistic["self_reference_pct"],
+        "hedging_pct":         linguistic["hedging_pct"],
+        "word_count":          linguistic["word_count"],
+        "exclamation_count":   linguistic["exclamation_count"],
+        "emoji_count":         linguistic["emoji_count"],
+        "typing_wpm":          typing["typing_wpm"],
+        "error_rate":          typing["error_rate"],
+        "hesitation_count":    typing["hesitation_count"],
+        "burst_pattern":       typing["burst_pattern"],
+        "linguistic_flags":    sentiment["flags"] + linguistic["linguistic_flags"],
         "combined_signal_score": combined,
+        "timestamp":           datetime.now(timezone.utc).isoformat(),
+        # ── Full breakdown for debugging / brain viz ──
         "detail": {
             "sentiment":  sentiment,
             "typing":     typing,
@@ -121,6 +139,11 @@ async def analyze(req: AnalyzeRequest):
     }
 
     _signals_store[req.user_id] = result
+    history = _history_store.setdefault(req.user_id, [])
+    history.append(result)
+    if len(history) > _HISTORY_LIMIT:
+        history.pop(0)
+
     return result
 
 
@@ -129,6 +152,32 @@ def get_signals(user_id: str):
     if user_id not in _signals_store:
         raise HTTPException(status_code=404, detail=f"No signals found for user {user_id}")
     return _signals_store[user_id]
+
+
+@app.get("/signals/{user_id}/history")
+def get_signal_history(user_id: str):
+    history = _history_store.get(user_id, [])
+    if not history:
+        raise HTTPException(status_code=404, detail=f"No history for user {user_id}")
+
+    # Trend: is word_count declining? (shorter messages = disengagement)
+    word_counts = [r["word_count"] for r in history]
+    wc_trend = "declining" if len(word_counts) > 2 and word_counts[-1] < word_counts[0] * 0.7 else "stable"
+
+    latencies = [r["response_latency_ms"] for r in history]
+    lat_trend = "increasing" if len(latencies) > 2 and latencies[-1] > latencies[0] * 1.5 else "stable"
+
+    scores = [r["combined_signal_score"] for r in history]
+
+    return {
+        "user_id":         user_id,
+        "record_count":    len(history),
+        "avg_score":       round(sum(scores) / len(scores), 1),
+        "score_trend":     "worsening" if len(scores) > 2 and scores[-1] > scores[0] + 10 else "stable",
+        "word_count_trend": wc_trend,
+        "latency_trend":   lat_trend,
+        "records":         history,
+    }
 
 
 # ── Alert endpoints ────────────────────────────────────────────────────────────
