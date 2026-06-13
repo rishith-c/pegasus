@@ -1,88 +1,63 @@
-"""Pegasus Backend — orchestrator + persistence. Frontend talks ONLY to this.
+"""Pegasus backend — FastAPI orchestrator on port 8001.
 
-Run (from inside /backend):
-    uvicorn main:app --reload --port 8001
+Wesley's Expo app and Dhruva's SMS bot both call this service; it calls Dhruva's
+signals (8002), Rishith's ML/TRIBE (8003) and video (8004), persists everything
+to SQLite, and serves history/metrics/brain views.
 """
-from __future__ import annotations
+import logging
+from contextlib import asynccontextmanager
 
-from typing import Optional
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
-import db
-import orchestrator
-import stimuli
+import config
+from models.database import init_db
+from routes import brain, history, metrics, response, score, stimulus, video
 
-app = FastAPI(title="Pegasus Backend", version="0.1.0")
+logging.basicConfig(level=logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Pegasus Backend", version="2.0.0", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-
-@app.on_event("startup")
-def _startup():
-    db.init_db()
-
-
-class UserIn(BaseModel):
-    name: str
-    phone: Optional[str] = None
+app.include_router(stimulus.router, prefix="/stimulus", tags=["stimulus"])
+app.include_router(response.router, prefix="/response", tags=["response"])
+app.include_router(score.router, prefix="/score", tags=["score"])
+app.include_router(brain.router, prefix="/brain", tags=["brain"])
+app.include_router(history.router, prefix="/history", tags=["history"])
+app.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
+app.include_router(video.router, prefix="/video", tags=["video"])
 
 
-class CheckInIn(BaseModel):
-    user_id: str
-    stimulus_id: str
-    text_response: str
-    response_time_ms: int = 0
-    typing_wpm: int = 0
-    error_rate: float = 0.0
+@app.get("/")
+def root():
+    return {"service": "Pegasus Backend", "version": "2.0.0", "docs": "/docs"}
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
-
-
-@app.post("/users")
-def create_user(body: UserIn):
-    return db.create_user(body.name, body.phone)
-
-
-@app.get("/users/{user_id}")
-def get_user(user_id: str):
-    user = db.get_user(user_id)
-    if not user:
-        raise HTTPException(404, "user not found")
-    return user
-
-
-@app.get("/stimulus/today")
-def stimulus_today(user_id: str = "demo"):
-    return stimuli.stimulus_for(user_id)
-
-
-@app.post("/checkin")
-def checkin(body: CheckInIn):
-    user = db.get_user(body.user_id)
-    phone = user.get("phone") if user else None
-    stimulus = stimuli.stimulus_for(body.user_id)
-    result = orchestrator.run_checkin(body.model_dump(), stimulus, phone)
-    db.save_checkin(body.user_id, body.stimulus_id,
-                    {"score": result["score"], "level": result["level"], "deviation": result["deviation"]},
-                    result["signal"], result["intervention"])
-    return result
-
-
-@app.get("/status/{user_id}")
-def status(user_id: str):
-    history = db.get_history(user_id)
-    return {"latest": history[0] if history else None, "history": history}
+    return {
+        "status": "pegasus backend running",
+        "port": config.BACKEND_PORT,
+        "signals_url": config.SIGNAL_SERVICE,
+        "ml_url": config.ML_SERVICE,
+        "video_url": config.VIDEO_SERVICE,
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run("main:app", host="0.0.0.0", port=config.BACKEND_PORT, reload=True)

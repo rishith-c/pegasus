@@ -1,0 +1,85 @@
+{
+  "version": "2.0.0",
+  "owner": "jason (backend)",
+  "description": "Pegasus API contract. Jason owns this file. Need a field changed? Tell Jason, he updates it, everyone pulls.",
+  "services": {
+    "frontend": "http://localhost:3000",
+    "backend": "http://localhost:8001",
+    "signals": "http://localhost:8002",
+    "ml": "http://localhost:8003",
+    "video": "http://localhost:8004"
+  },
+  "levels": {
+    "green": "score < 30",
+    "yellow": "30 <= score < 65",
+    "red": "score >= 65"
+  },
+  "stimulus": {
+    "id": "string",
+    "type": "image|audio|text",
+    "url": "string",
+    "category": "calm|neutral|activating",
+    "prompt": "string"
+  },
+  "user_response": {
+    "user_id": "string",
+    "stimulus_id": "string",
+    "response_text": "string",
+    "response_time_ms": "number",
+    "response_latency_ms": "number",
+    "typing_wpm": "number",
+    "error_rate": "number (0-100)",
+    "source": "app|sms",
+    "timestamp": "ISO8601"
+  },
+  "burnout_result": {
+    "score": "0-100",
+    "level": "green|yellow|red",
+    "tribe_deviation": "number",
+    "behavioral_deviation": "number",
+    "top_indicators": ["string"],
+    "intervention": "string (Claude-generated via ML; warm, actionable, non-diagnostic)",
+    "brain_regions_flagged": ["string"],
+    "confidence": "0-1",
+    "breakdown": {
+      "imessage": "number (text/SMS sentiment burnout contribution 0-100)",
+      "typing": "number (typing biometrics 0-100)",
+      "facial": "number (video facial stress 0-100, 0 if no video)",
+      "voice": "number (video voice stress 0-100, 0 if no video)",
+      "tribe": "number (TRIBE deviation contribution 0-100)"
+    },
+    "support": "[{name, contact, type}] human-support resources; populated ONLY on red (PRD §6: red always routes to human support)",
+    "source": "app|sms|video|tribe|fallback",
+    "timestamp": "ISO8601"
+  },
+  "endpoints": {
+    "backend (8001, owner: jason)": {
+      "GET /health": "-> service status",
+      "GET /stimulus/today/{user_id}": "-> stimulus (daily rotation)",
+      "GET /stimulus/all": "-> [stimulus, ...]",
+      "POST /response/submit": "user_response -> burnout_result (orchestrates signals -> ML -> store)",
+      "GET /score/{user_id}": "-> latest burnout_result",
+      "GET /history/{user_id}": "-> [burnout_result, ...] (most recent first, up to 30)",
+      "GET /metrics/{user_id}": "-> { score_trend, latest_breakdown, total_checkins }",
+      "GET /brain/{user_id}": "-> { regions, ... } TRIBE brain data for the latest stimulus",
+      "POST /video/submit": "multipart (video, user_id) -> { facial, voice, combined_score, burnout_result } — fuses facial/voice into a burnout score (PRD 4.5); raw video is never stored"
+    },
+    "signals (8002, owner: dhruva)": {
+      "POST /analyze": "{ user_id, response_text, response_time_ms, typing_wpm, error_rate, [+optional keystroke biometrics: hesitation_count, burst_pattern, avg_key_hold_ms, flight_time_ms, correction_loops] } -> FLAT { sentiment_score, energy_level, combined_signal_score, linguistic_flags, typing_stress_score, future_tense_pct, self_referential_pct, hedging_count, flat_affect, word_count, ..., detail{sentiment,typing,temporal,linguistic} }",
+      "GET /signals/{user_id}": "-> latest analyzed signals",
+      "GET /signals/{user_id}/history": "-> { records, record_count, avg_score, score_trend, word_count_trend }",
+      "POST /alert/send": "{ user_id, score, level, intervention } -> { sent, message_sid }  (SMS only on red; phone looked up from a prior /register-phone)",
+      "POST /register-phone": "{ user_id, phone } -> { registered }",
+      "POST /send-checkin": "{ user_id, phone } -> sends a stimulus over SMS",
+      "POST /sms/webhook": "Twilio inbound SMS webhook (Dhruva's bot)"
+    },
+    "ml (8003, owner: rishith)": {
+      "POST /score": "{ user_id, stimulus_id, signals } -> burnout_result",
+      "GET /baseline/{stimulus_id}": "-> { regions, ... } TRIBE baseline brain activation"
+    },
+    "video (8004, owner: rishith)": {
+      "POST /analyze/video": "multipart video (field name 'video') -> { facial: {facial_stress_score, ...}, voice: {voice_stress_score, ...}, combined_score: number }"
+    }
+  },
+  "notes": "Backend keeps a graceful-fallback layer: if signals (8002) or ML (8003) are offline, /response/submit returns a degraded burnout_result (source='fallback') instead of erroring, so the app + SMS bot keep working during the demo."
+}

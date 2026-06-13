@@ -91,8 +91,8 @@ class BurnoutScorer:
             "breakdown": {
                 "imessage": int((1 - sentiment) * 100),
                 "typing": int(min(error_rate / 20, 1) * 100),
-                "facial": int(signals.get("facial_stress_score", 0)),
-                "voice": int(signals.get("voice_stress_score", 0)),
+                "facial": int(signals.get("facial_score") or signals.get("facial_stress_score") or 0),
+                "voice": int(signals.get("voice_score") or signals.get("voice_stress_score") or 0),
                 "tribe": int(deviation * 100),
             },
         }

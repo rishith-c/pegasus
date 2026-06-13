@@ -51,3 +51,8 @@ imessage/*.scpt
 frontend/.expo/
 frontend/web-build/
 *.tsbuildinfo
+
+# Local integration venv + sqlite
+.venv-int/
+*.db
+pegasus.db

@@ -1,74 +1,192 @@
-"""Pegasus Signals service — behavioral analysis + SMS alerts.
-
-Run (from inside /signals):
-    uvicorn main:app --reload --port 8002
-"""
-from __future__ import annotations
-
-from typing import Dict, Optional
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
+from typing import Optional
+from dotenv import load_dotenv
+from datetime import datetime, timezone
 
-import alerts
-import sentiment
+from analyzers.sentiment import analyze_sentiment
+from analyzers.linguistic import analyze_linguistic
+from analyzers.typing_patterns import analyze_typing
+from analyzers.temporal import analyze_temporal
+from alerts.twilio_sms import send_alert_sms, send_sms, USER_PHONES
+from sms_bot.webhook import handle_incoming_sms
 
-app = FastAPI(title="Pegasus Signals", version="0.1.0")
+load_dotenv()
+
+app = FastAPI(title="Pegasus Signals")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# In-memory: latest signal per user (fine for a hackathon demo).
-_LATEST: Dict[str, Dict] = {}
+# in-memory signal store
+_latest:  dict[str, dict] = {}
+_history: dict[str, list] = {}
+_LIMIT = 30
 
 
-class AnalyzeIn(BaseModel):
+# ── Request models ─────────────────────────────────────────────────────────────
+
+class AnalyzeRequest(BaseModel):
     user_id: str
-    text: str = ""
-    typing_wpm: int = 0
-    error_rate: float = 0.0
+    response_text: str
     response_time_ms: int = 0
+    typing_wpm: int = 0
+    error_rate: int = 0
+    # rich biometrics from TypingBiometrics (collector.js)
+    hesitation_count: Optional[int]   = 0
+    burst_pattern:    Optional[str]   = "steady"
+    avg_key_hold_ms:  Optional[float] = 100
+    flight_time_ms:   Optional[float] = 150
+    correction_loops: Optional[int]   = 0
 
-
-class AlertIn(BaseModel):
+class AlertRequest(BaseModel):
     user_id: str
-    phone: str
     score: int
     level: str
     intervention: str
 
+class RegisterPhoneRequest(BaseModel):
+    user_id: str
+    phone: str
+
+class CheckinRequest(BaseModel):
+    user_id: str
+    phone: str
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "signals service running", "port": 8002}
 
 
-@app.post("/signals/analyze")
-def analyze(body: AnalyzeIn):
-    result = sentiment.analyze(
-        body.text, body.typing_wpm, body.error_rate, body.response_time_ms
-    )
-    _LATEST[body.user_id] = result
+@app.post("/analyze")
+async def analyze(req: AnalyzeRequest):
+    sentiment  = analyze_sentiment(req.response_text)
+    linguistic = analyze_linguistic(req.response_text)
+    typing     = analyze_typing({
+        "typing_wpm":        req.typing_wpm,
+        "error_rate":        req.error_rate,
+        "response_time_ms":  req.response_time_ms,
+        "hesitation_count":  req.hesitation_count,
+        "burst_pattern":     req.burst_pattern,
+        "avg_key_hold_ms":   req.avg_key_hold_ms,
+        "flight_time_ms":    req.flight_time_ms,
+        "correction_loops":  req.correction_loops,
+    })
+    temporal = analyze_temporal(req.response_time_ms)
+
+    combined = min(100, round(
+        (1 - sentiment["sentiment_score"]) * 40
+        + typing["burnout_contribution"]
+        + temporal["burnout_contribution"]
+        + linguistic["burnout_contribution"],
+        1,
+    ))
+
+    result = {
+        # ── spec-required fields ──
+        "sentiment_score":     sentiment["sentiment_score"],
+        "energy_level":        sentiment["energy_level"],
+        "future_tense_pct":    linguistic["future_tense_pct"],
+        "self_referential_pct": linguistic["self_referential_pct"],
+        "hedging_count":       linguistic["hedging_count"],
+        "flat_affect":         linguistic["flat_affect"],
+        "typing_stress_score": typing["stress_score"],
+        "linguistic_flags":    linguistic["linguistic_flags"],
+        # ── extras for Jason's combined scorer ──
+        "user_id":             req.user_id,
+        "response_latency_ms": req.response_time_ms,
+        "word_count":          linguistic["word_count"],
+        "exclamation_count":   linguistic["exclamation_count"],
+        "emoji_count":         linguistic["emoji_count"],
+        "typing_wpm":          typing["typing_wpm"],
+        "error_rate":          typing["error_rate"],
+        "hesitation_count":    typing["hesitation_count"],
+        "burst_pattern":       typing["burst_pattern"],
+        "combined_signal_score": combined,
+        "timestamp":           datetime.now(timezone.utc).isoformat(),
+        "detail": {
+            "sentiment":  sentiment,
+            "typing":     typing,
+            "temporal":   temporal,
+            "linguistic": linguistic,
+        },
+    }
+
+    _latest[req.user_id] = result
+    hist = _history.setdefault(req.user_id, [])
+    hist.append(result)
+    if len(hist) > _LIMIT:
+        hist.pop(0)
+
     return result
 
 
 @app.get("/signals/{user_id}")
-def latest(user_id: str):
-    if user_id not in _LATEST:
-        raise HTTPException(404, "no signals for user")
-    return _LATEST[user_id]
+def get_signals(user_id: str):
+    if user_id not in _latest:
+        raise HTTPException(404, f"No signals for user {user_id}")
+    return _latest[user_id]
 
 
-@app.post("/alert")
-def alert(body: AlertIn):
-    if body.level != "red":
-        return {"sent": False, "message_sid": None, "reason": "level_not_red"}
-    return alerts.send_alert(body.phone, body.score, body.level, body.intervention)
+@app.get("/signals/{user_id}/history")
+def get_history(user_id: str):
+    hist = _history.get(user_id, [])
+    if not hist:
+        raise HTTPException(404, f"No history for user {user_id}")
+    scores = [r["combined_signal_score"] for r in hist]
+    words  = [r["word_count"] for r in hist]
+    return {
+        "user_id":          user_id,
+        "record_count":     len(hist),
+        "avg_score":        round(sum(scores) / len(scores), 1),
+        "score_trend":      "worsening" if len(scores) > 2 and scores[-1] > scores[0] + 10 else "stable",
+        "word_count_trend": "declining" if len(words) > 2 and words[-1] < words[0] * 0.7 else "stable",
+        "records":          hist,
+    }
+
+
+@app.post("/alert/send")
+async def alert_send(req: AlertRequest):
+    if req.level == "red":
+        sid = send_alert_sms(req.user_id, req.score, req.intervention)
+        return {"sent": True, "message_sid": sid}
+    return {"sent": False, "reason": f"level is '{req.level}', SMS reserved for red"}
+
+
+@app.post("/register-phone")
+def register_phone(req: RegisterPhoneRequest):
+    """Register a user's phone so alert SMS knows where to send."""
+    USER_PHONES[req.user_id] = req.phone
+    return {"registered": True, "user_id": req.user_id, "phone": req.phone}
+
+
+@app.post("/send-checkin")
+async def send_checkin(req: CheckinRequest):
+    """Manually trigger today's pulse-check SMS (demo / cron endpoint)."""
+    from sms_bot.stimulus_sender import trigger_checkin
+    try:
+        return await trigger_checkin(req.user_id, req.phone)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/sms/webhook")
+async def sms_webhook(request: Request):
+    """Bloo.io inbound SMS webhook — register this URL in Bloo.io dashboard."""
+    payload     = await request.json()
+    from_number = payload.get("from") or payload.get("sender") or payload.get("phone", "")
+    body        = payload.get("text") or payload.get("body") or payload.get("message", "")
+    return await handle_incoming_sms(from_number, body)
 
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    uvicorn.run("main:app", host="0.0.0.0", port=8002, reload=True)
