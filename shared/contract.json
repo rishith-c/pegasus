@@ -1,0 +1,68 @@
+{
+  "version": "1.1.0",
+  "owner": "jason (backend)",
+  "description": "Pegasus API contract. Jason owns this file. If you need a field, tell Jason.",
+  "services": {
+    "frontend": "http://localhost:3000",
+    "backend": "http://localhost:8001",
+    "signals": "http://localhost:8002",
+    "ml": "http://localhost:8003"
+  },
+  "levels": {
+    "green": "score < 30",
+    "yellow": "30 <= score < 65",
+    "red": "score >= 65"
+  },
+  "stimulus": {
+    "id": "string",
+    "type": "scenario|word|task",
+    "valence": "positive|negative|neutral",
+    "tribe_expected_engagement": "number (0-1), TRIBE v2 predicted engagement for a healthy brain",
+    "content": "string, the stimulus text shown to the user",
+    "prompt": "string, instruction for how the user should respond"
+  },
+  "user_response": {
+    "user_id": "string",
+    "stimulus_id": "string",
+    "response_text": "string",
+    "response_time_ms": "number",
+    "typing_wpm": "number",
+    "error_rate": "number (0-100, percent of keystrokes that were backspaces)",
+    "timestamp": "ISO8601"
+  },
+  "burnout_result": {
+    "user_id": "string",
+    "stimulus_id": "string",
+    "score": "number (0-100, higher = more burnout)",
+    "level": "green|yellow|red",
+    "tribe_deviation": "number (0-1)",
+    "behavioral_deviation": "number (0-1)",
+    "top_indicators": ["string"],
+    "intervention": "string",
+    "brain_regions_flagged": ["string"],
+    "confidence": "number (0-1)",
+    "source": "tribe|fallback (tribe = scored by ML service, fallback = backend heuristic when ML offline)",
+    "timestamp": "ISO8601"
+  },
+  "endpoints": {
+    "backend (8001, owner: jason)": {
+      "POST /stimulus/send": "{ user_id, stimulus_id } -> { user_id, stimulus }",
+      "POST /response/submit": "{ user_id, stimulus_id, response_text, response_time_ms, typing_wpm, error_rate } -> burnout_result",
+      "GET /score/{user_id}": "-> latest burnout_result",
+      "GET /brain/{user_id}": "-> { brain_regions, brain_regions_flagged, level, score, ... }",
+      "GET /history/{user_id}": "-> { history: [burnout_result, ...] }",
+      "GET /stimuli": "-> { stimuli: [stimulus, ...] }",
+      "GET /health": "-> service status"
+    },
+    "signals (8002, owner: dhruva)": {
+      "POST /analyze": "{ user_id, response_text, response_time_ms, typing_wpm, error_rate } -> { sentiment_score, energy_level, linguistic_flags, combined_signal_score, detail }",
+      "GET /signals/{user_id}": "-> latest analyzed signals",
+      "POST /alert": "{ user_id, phone, score, level, intervention } -> { sent, message_sid }"
+    },
+    "ml (8003, owner: rishith)": {
+      "POST /predict": "{ stimulus_path, modality } -> { brain_activation, regions }",
+      "POST /score": "{ user_id, stimulus_id, signals } -> burnout_result"
+    }
+  },
+  "notes": "stimulus shape mirrors signals/stimuli/bank.py (the live source of truth for stimuli). shared/stimuli.json is the canonical manifest the backend serves."
+}

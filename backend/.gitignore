@@ -1,0 +1,11 @@
+# SQLite database files (created at runtime)
+*.db
+*.sqlite3
+pegasus.db
+
+# Local virtualenv
+.venv/
+venv/
+
+# Env
+.env
