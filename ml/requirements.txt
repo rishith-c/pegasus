@@ -1,8 +1,8 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
+modal==0.66.45
 anthropic==0.42.0
+requests==2.32.3
+numpy==1.26.4
 python-dotenv==1.0.1
-# Real TRIBE v2 inference (uncomment when wiring the model):
-# torch
-# transformers

@@ -1,87 +1,67 @@
-"""Pegasus ML service (:8003) — TRIBE v2 prediction + combined burnout scoring.
+"""Pegasus ML service (:8003) — scoring around TRIBE v2 (already on Modal).
+
+TRIBE v2 is deployed separately on Modal as app `pegasus-tribe`, class
+`TribePredictor`. We just call it; we do NOT redeploy or rewrite it.
 
 Run (from inside /ml):
-    uvicorn main:app --reload --port 8003
-
-Endpoints:
-    GET  /health
-    POST /predict          TRIBE v2 healthy-brain prediction for a stimulus
-    GET  /baseline/{sid}   cached prediction for a stimulus_id
-    POST /score            merge all signal streams -> burnout_result
+    modal token new           # once, to authenticate Modal
+    uvicorn main:app --port 8003 --reload
 """
 from __future__ import annotations
 
-from typing import Dict, Optional
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from combined_scorer import compute_final_score
-from scoring import compute_tribe_deviation
-from tribe_inference import TribeModel
+from scoring import BurnoutScorer
 
-app = FastAPI(title="Pegasus ML", version="0.2.0")
+app = FastAPI(title="Pegasus ML")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-model = TribeModel()
+scorer = BurnoutScorer()
 
 
-class StimulusIn(BaseModel):
-    stimulus_id: str = "demo"
-    type: str = "text"
-    content: str = ""
-    prompt: str = ""
+def _tribe():
+    """Lazy handle to the deployed TRIBE class. Returns None if Modal isn't
+    available (keeps the service runnable offline — scorer handles None baseline)."""
+    try:
+        import modal
+
+        return modal.Cls.from_name("pegasus-tribe", "TribePredictor")
+    except Exception:
+        return None
 
 
-class PredictIn(BaseModel):
-    stimulus: StimulusIn
+def _baseline(stimulus_id: str):
+    Tribe = _tribe()
+    if Tribe is None:
+        return None
+    try:
+        return Tribe().get_baseline.remote(stimulus_id)
+    except Exception:
+        return None
 
 
-class ScoreIn(BaseModel):
-    """All signal streams. Any may be omitted — the scorer renormalizes over
-    whatever is present (e.g. a text-only check-in has no facial/voice)."""
-    user_id: str = "demo"
-    stimulus: Optional[StimulusIn] = None
-    imessage_signals: Optional[Dict] = None
-    typing_biometrics: Optional[Dict] = None
-    facial_analysis: Optional[Dict] = None
-    voice_analysis: Optional[Dict] = None
+class ScoreReq(BaseModel):
+    user_id: str
+    stimulus_id: str
+    signals: dict
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": model.model_name}
+    return {"status": "ml running", "tribe": "connected" if _tribe() is not None else "offline"}
 
 
-@app.post("/predict")
-def predict(body: PredictIn):
-    return model.predict(body.stimulus.model_dump())
+@app.post("/score")
+def score(req: ScoreReq):
+    baseline = _baseline(req.stimulus_id)
+    return scorer.compute_deviation(baseline, req.signals)
 
 
 @app.get("/baseline/{stimulus_id}")
 def baseline(stimulus_id: str):
-    b = model.baseline(stimulus_id)
-    if not b:
-        raise HTTPException(404, "no cached baseline for that stimulus_id")
-    return b
-
-
-@app.post("/score")
-def score(body: ScoreIn):
-    tribe_dev = None
-    if body.stimulus is not None:
-        b = model.predict(body.stimulus.model_dump())
-        tribe_dev = compute_tribe_deviation(b, body.imessage_signals)
-    result = compute_final_score(
-        imessage=body.imessage_signals,
-        typing=body.typing_biometrics,
-        facial=body.facial_analysis,
-        voice=body.voice_analysis,
-        tribe_deviation=tribe_dev,
-    )
-    result["user_id"] = body.user_id
-    return result
+    return _baseline(stimulus_id) or {"error": "tribe baseline unavailable", "regions": {}}
 
 
 if __name__ == "__main__":

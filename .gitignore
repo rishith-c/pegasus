@@ -46,8 +46,8 @@ imessage/.state.json
 imessage/registry.json
 imessage/*.scpt
 
-# ML / video runtime artifacts (keep the dirs, ignore generated/large files)
-ml/cache/*.json
-video/models/*
-!ml/cache/.gitkeep
-!video/models/.gitkeep
+# Expo / React Native
+.expo/
+frontend/.expo/
+frontend/web-build/
+*.tsbuildinfo

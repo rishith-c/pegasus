@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Pegasus",
+    "slug": "pegasus",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "pegasus",
+    "splash": { "backgroundColor": "#0a0a0a" },
+    "ios": { "supportsTablet": true, "infoPlist": { "NSCameraUsageDescription": "Pegasus uses the camera for your 30-second video check-in.", "NSMicrophoneUsageDescription": "Pegasus uses the mic to analyze voice stress during your check-in." } },
+    "android": { "permissions": ["CAMERA", "RECORD_AUDIO"] },
+    "plugins": ["expo-camera"]
+  }
+}

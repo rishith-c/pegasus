@@ -1,33 +1,26 @@
 # video — facial + voice stress (Rishith, :8004)
 
 Analyzes a 30-60s check-in clip:
-- **Facial** (MediaPipe Face Mesh, 468 landmarks): stress score, eye/blink,
-  brow furrow, lip compression, jaw clench, affect.
-- **Voice** (Whisper + librosa): transcript, pitch mean/variability, speaking
-  rate, pause frequency, tremor.
+- **Facial** — my own stress heuristics on MediaPipe Face Mesh landmarks
+  (EAR-style eye openness, inner-brow gap, lip compression, jaw width). No CV API.
+- **Voice** — NVIDIA STT transcript + librosa pitch / tremor / speaking rate.
+- **TTS** (bonus) — NVIDIA TTS speaks the intervention aloud (`tts.py`).
 
-Feeds the `facial_analysis` + `voice_analysis` streams into the ML combined
-scorer (`/ml` :8003).
-
-## Endpoints
-- `GET  /health`
-- `POST /analyze/video` — multipart `file` (video) → `{ facial, voice }`
-- `POST /analyze/frame` — multipart `file` (image) → facial indicators
+Returns `{ facial, voice, combined_score }`. The backend forwards the user's
+clip here, then feeds the result into `/ml`'s scorer.
 
 ## Run
 ```bash
 cd video && python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt        # heavy: mediapipe, whisper, librosa
-brew install ffmpeg                     # whisper needs it
-uvicorn main:app --reload --port 8004
+pip install -r requirements.txt        # mediapipe, opencv, librosa
+brew install ffmpeg                     # audio extraction
+cp .env.example .env                    # NVIDIA_STT_KEY, NVIDIA_TTS_KEY
+uvicorn main:app --port 8004 --reload
 ```
-Models (MediaPipe, Whisper) load lazily on the first analyze call — `/health`
-responds immediately. First `/analyze/video` will be slow while Whisper
-downloads its weights.
+Models load lazily on first `/analyze/video`, so `/health` is instant.
 
 ## Notes
-- `facial_stress_score` is the highest-weighted stream in the combined scorer
-  (hardest to fake). `forced_smile` / `gaze_stability` are placeholders pending
-  iris tracking + AU6/AU12 mismatch detection.
-- On-device iOS path (Apple Vision + CoreML) is the privacy-preferred
-  alternative to this cloud service — see the project spec.
+- `forced_smile` / `gaze_stability` are placeholders pending iris tracking +
+  AU6/AU12 mismatch.
+- Without NVIDIA keys, voice returns an empty transcript + librosa-only acoustics
+  (still produces a stress signal); facial works fully offline.

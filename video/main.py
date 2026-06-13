@@ -1,30 +1,26 @@
 """Pegasus Video service (:8004) — facial + voice stress from a check-in clip.
 
 Run (from inside /video):
-    uvicorn main:app --reload --port 8004
+    uvicorn main:app --port 8004 --reload
 
 Endpoints:
     GET  /health
-    POST /analyze/video   multipart 'file' (video) -> { facial, voice }
-    POST /analyze/frame   multipart 'file' (image) -> facial indicators
+    POST /analyze/video   multipart 'video' -> { facial, voice, combined_score }
 
-Heavy models (MediaPipe, Whisper) load lazily on first analyze call, so the
-service boots instantly and /health works before anything is downloaded.
+Heavy analyzers (MediaPipe / librosa) load lazily on the first call, so the
+service boots instantly and /health works before models are ready.
+Requires ffmpeg on the system (audio extraction):  brew install ffmpeg
 """
 from __future__ import annotations
 
 import os
 import tempfile
-from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Pegasus Video", version="0.1.0")
+app = FastAPI(title="Pegasus Video")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-# Sample at most this many frames from a clip (keeps latency reasonable).
-MAX_FRAMES = int(os.getenv("VIDEO_MAX_FRAMES", "150"))
 
 _facial = None
 _voice = None
@@ -44,78 +40,60 @@ def _get_voice():
     if _voice is None:
         from voice_analyzer import VoiceStressAnalyzer
 
-        _voice = VoiceStressAnalyzer(os.getenv("WHISPER_MODEL", "base"))
+        _voice = VoiceStressAnalyzer()
     return _voice
-
-
-def _read_frames(path: str):
-    import cv2
-
-    cap = cv2.VideoCapture(path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-    step = max(1, total // MAX_FRAMES) if total else 1
-    frames, i = [], 0
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
-        if i % step == 0:
-            frames.append(frame)
-        i += 1
-    cap.release()
-    return frames, int(fps)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "video", "facial_loaded": _facial is not None,
-            "voice_loaded": _voice is not None}
+    return {"status": "video running"}
 
 
 @app.post("/analyze/video")
-async def analyze_video(file: UploadFile = File(...)):
-    suffix = os.path.splitext(file.filename or "clip.mp4")[1] or ".mp4"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
+async def analyze_video(video: UploadFile = File(...)):
+    import cv2
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        tmp.write(await video.read())
         path = tmp.name
+    audio = path.replace(".mp4", ".wav")
     try:
-        facial_result, voice_result = {}, {}
+        # Sample every 10th frame (~3fps from 30fps source).
+        cap = cv2.VideoCapture(path)
+        frames, i = [], 0
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if i % 10 == 0:
+                frames.append(frame)
+            i += 1
+        cap.release()
+
         try:
-            frames, fps = _read_frames(path)
-            facial_result = _get_facial().analyze_video(frames, fps) if frames else {"error": "no frames"}
+            facial_result = _get_facial().analyze_video(frames) if frames else {"error": "no frames", "facial_stress_score": 0}
         except Exception as e:
-            facial_result = {"error": f"facial analysis failed: {e}"}
+            facial_result = {"error": f"facial failed: {e}", "facial_stress_score": 0}
+
         try:
-            voice_result = _get_voice().analyze_audio(path)
+            os.system(f"ffmpeg -i {path} -vn -ar 16000 {audio} -y -loglevel quiet")
+            voice_result = _get_voice().analyze_audio(audio)
         except Exception as e:
-            voice_result = {"error": f"voice analysis failed: {e}"}
-        return {"facial": facial_result, "voice": voice_result}
+            voice_result = {"error": f"voice failed: {e}", "pitch_mean_hz": 0, "voice_tremor": False, "pause_frequency": 0}
+
+        fs = facial_result.get("facial_stress_score", 0)
+        vs = (
+            min(voice_result.get("pitch_mean_hz", 150) / 300, 1) * 40
+            + (20 if voice_result.get("voice_tremor") else 0)
+            + min(voice_result.get("pause_frequency", 0) / 10, 1) * 40
+        )
+        return {"facial": facial_result, "voice": voice_result, "combined_score": int(fs * 0.6 + vs * 0.4)}
     finally:
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
-
-
-@app.post("/analyze/frame")
-async def analyze_frame(file: UploadFile = File(...)):
-    try:
-        import cv2
-        import numpy as np
-
-        data = np.frombuffer(await file.read(), np.uint8)
-        frame = cv2.imdecode(data, cv2.IMREAD_COLOR)
-        if frame is None:
-            raise HTTPException(400, "could not decode image")
-        result = _get_facial().analyze_frame(frame)
-        if result is None:
-            return {"error": "no face detected"}
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(503, f"facial analysis unavailable: {e}")
+        for p in (path, audio):
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

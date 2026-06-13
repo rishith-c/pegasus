@@ -1,51 +1,50 @@
-# `/ml` (+ `/video`) — Rishith's agent
+# `/ml` (+ `/video` + frontend data layer) — Rishith's agent
 
-You are **Rishith**. You own **`ml/` and `video/`**. `ml/` is the brain pipeline
-+ combined scorer on **:8003**; `video/` is facial/voice analysis on **:8004**
-(see `../video/AGENTS.md`). Read `../AGENTS.md` and `../shared/contract.md` first.
+You are **Rishith**. You own **`ml/`**, **`video/`**, and the **frontend data
+layer** (`frontend/src/services`, `frontend/src/hooks`, `frontend/src/types`).
+`ml/` is the burnout scorer on **:8003**. Read `../AGENTS.md` first.
 
 ## Never touch
-`/frontend`, `/backend`, `/signals`, `/shared`. Need data? Call their API. Need a
-contract change? Tell Jason (see below — the score contract has changed).
+Wesley's screens/components (`frontend/App.tsx`, `src/screens`, `src/components`,
+`src/navigation`, `src/utils`), `/backend`, `/signals`, `/shared`. Call APIs;
+ask Jason for contract changes.
 
-## Your endpoints (:8003)
-- `GET  /health` → `{status, model}`
-- `POST /predict` → TRIBE v2 healthy-brain prediction (+ per-region activations)
-- `GET  /baseline/{stimulus_id}` → cached prediction for the Brain View
-- `POST /score` → **merges all signal streams** → burnout result
+## TRIBE v2 — already deployed on Modal
+TRIBE runs separately on Modal as app `pegasus-tribe`, class `TribePredictor`.
+**Do NOT redeploy or rewrite it.** Just call it:
+```python
+import modal
+Tribe = modal.Cls.from_name("pegasus-tribe", "TribePredictor")
+baseline = Tribe().get_baseline.remote(stimulus_id)
+```
+`main.py` calls it lazily and degrades to a null baseline if Modal is offline.
+
+## Endpoints (:8003)
+- `GET  /health` → `{status, tribe}`
+- `POST /score` → `{user_id, stimulus_id, signals}` → `BurnoutResult`
+- `GET  /baseline/{stimulus_id}` → cached TRIBE prediction
 
 ## Files
-- `tribe_inference.py` — TRIBE v2 wrapper (`TribeModel`). **Currently a seeded
-  STUB** — your headline task is real TRIBE v2 inference in `_infer`. Predictions
-  are cached in `cache/baselines.json`.
-- `scoring.py` — `compute_tribe_deviation` (behavior vs healthy baseline → 0-1).
-- `combined_scorer.py` — the 4-stream + tribe weighted engine; renormalizes over
-  whichever streams are present (text-only check-ins still score).
-- `claude_interpreter.py` — Claude (`claude-sonnet-4-6`) intervention + fallback.
-- `stimuli/manifest.json` — stimulus pool.
-- `main.py` — FastAPI wiring.
+- `main.py` — FastAPI + Modal TRIBE client.
+- `scoring.py` — `BurnoutScorer`: HF emotion model (`hf_sentiment`) +
+  deviation math (`compute_deviation`) + Claude intervention (`_intervene`).
+  Returns `BurnoutResult` (score, level, tribe/behavioral deviation, indicators,
+  intervention, brain_regions_flagged, confidence, breakdown).
 
-## ⚠️ Contract changes to tell Jason (`shared/contract.md`)
-1. `POST /score` now takes the full bundle:
-   `{ user_id, stimulus, imessage_signals, typing_biometrics, facial_analysis, voice_analysis }`
-   and returns `{ score, level, breakdown{imessage,typing,facial,voice,tribe},
-   streams_used, top_indicators, intervention, user_id }`.
-2. Engine-light thresholds changed to spec: **green <30, yellow <65, red ≥65**
-   (was 40/70). Backend + contract should match.
-3. Standalone `/intervention` endpoint is **gone** — intervention is part of
-   `/score`. New `GET /baseline/{stimulus_id}` added for the Brain View.
+## Secrets (.env, gitignored)
+`HF_TOKEN`, `ANTHROPIC_API_KEY`. Modal auth via `modal token new`. Read with
+`os.getenv`. Levels: green <30, yellow <65, red ≥65.
 
 ## Run
 ```bash
 cd ml && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # ANTHROPIC_API_KEY optional (stub + fallback work without)
-uvicorn main:app --reload --port 8003
+pip install -r requirements.txt && cp .env.example .env
+modal token new        # once
+uvicorn main:app --port 8003 --reload
 ```
 
-## Git
+## Git — branch `feat/rishith-ml`
 ```bash
-git checkout feat/rishith-ml
-git add ml/ video/     # ONLY your two folders
-git commit -m "feat(ml): ..." && git push origin feat/rishith-ml
+git add ml/ video/ frontend/src/services/ frontend/src/hooks/ frontend/src/types/
+git commit -m "feat: ..." && git push origin feat/rishith-ml
 ```

@@ -1,34 +1,49 @@
-# `/frontend` — Wesley's agent
+# `/frontend` — SHARED by Rishith + Wesley (Expo app, :3000)
 
-You are **Wesley**. You own **`frontend/` only**. You build the React UI on
-**:3000**. Read `../AGENTS.md` and `../shared/contract.md` first.
+This is an **Expo (React Native + TypeScript)** app with **two owners**. Stay
+strictly in your files so you never overwrite each other.
 
-## Never touch
-`/backend`, `/ml`, `/signals`, `/shared`. You talk to **the backend only**
-(`:8001`), through the Vite `/api` proxy (already configured).
+## Rishith owns — the DATA LAYER
+```
+frontend/src/services/api.ts
+frontend/src/services/config.ts
+frontend/src/hooks/*          (useResponseTracker, useBurnoutScore, useCamera)
+frontend/src/types/index.ts
+```
+Plus the one-time Expo bootstrap (`package.json`, `app.json`, `tsconfig.json`,
+`babel.config.js`, `index.ts`) — but `App.tsx` and everything below is Wesley's.
 
-## What the UI does
-1. Get/create a user, fetch `GET /api/stimulus/today`.
-2. Show the stimulus; capture the response with `KeystrokeTracker`
-   (`src/keystroke.js`, synced from `/signals/collector.js`).
-3. `POST /api/checkin` with text + typing metrics.
-4. Render the Check Engine Light (🟢/🟡/🔴) + intervention (`EngineLight.jsx`).
+## Wesley owns — the VISUAL LAYER
+```
+frontend/App.tsx
+frontend/src/navigation/*
+frontend/src/screens/*
+frontend/src/components/*
+frontend/src/utils/*          (colors.ts, formatting.ts)
+```
+Wesley **imports** Rishith's types/api/hooks and never edits them.
 
-## Files
-- `src/App.jsx` — flow + state.
-- `src/api.js` — backend client (all calls via `/api`).
-- `src/EngineLight.jsx` — result card.
-- `src/keystroke.js` — typing tracker (keep in sync with Dhruva's `collector.js`).
-- `vite.config.js` — `/api` → `:8001` proxy.
+## The interface (stable — Wesley imports these)
+```ts
+import { Stimulus, UserResponse, BurnoutResult, BrainData, FacialAnalysis, VoiceAnalysis } from "./src/types";
+import { getStimulus, submitResponse, getScore, getHistory, getBrainData, getMetrics, submitVideo } from "./src/services/api";
+import { useResponseTracker } from "./src/hooks/useResponseTracker"; // { onKeyPress, onChangeText, getMetrics, reset }
+import { useBurnoutScore } from "./src/hooks/useBurnoutScore";       // { score, loading, error, refresh }
+import { useCamera } from "./src/hooks/useCamera";                   // { cameraRef, granted, requestPermission, isRecording, startRecording, stopRecording }
+```
+
+## Commit staging (NEVER `git add frontend/` or `git add .`)
+```bash
+# Rishith:
+git add frontend/src/services/ frontend/src/hooks/ frontend/src/types/ ml/ video/
+# Wesley:
+git add frontend/App.tsx frontend/src/navigation/ frontend/src/screens/ frontend/src/components/ frontend/src/utils/
+```
 
 ## Run
 ```bash
-cd frontend && npm install && npm run dev   # http://localhost:3000
+cd frontend && npm install
+npx expo install react-native-chart-kit react-native-svg @react-navigation/native @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context expo-linear-gradient expo-haptics react-native-reanimated
+npx expo start     # press i (iOS) / a (Android), or scan with Expo Go
 ```
-
-## Git
-```bash
-git checkout feat/wesley-ui
-git add frontend/    # ONLY frontend/
-git commit -m "feat(frontend): ..." && git push origin feat/wesley-ui
-```
+Set your laptop's LAN IP in `src/services/config.ts` so the phone reaches the backend.
