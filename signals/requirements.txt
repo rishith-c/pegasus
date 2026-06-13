@@ -1,0 +1,5 @@
+anthropic
+twilio
+fastapi
+uvicorn[standard]
+python-dotenv

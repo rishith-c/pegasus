@@ -1,0 +1,9 @@
+📊 Pegasus Weekly Burnout Summary
+
+User: {user_id}
+Average burnout score this week: {avg_score}/100
+Top signals detected: {top_flags}
+
+Keep an eye on your mental health. Small breaks make a big difference.
+
+— Pegasus Mental Health Monitor
