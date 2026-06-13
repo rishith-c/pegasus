@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from analyzers import analyze_sentiment, analyze_typing, analyze_temporal, analyze_linguistic
 from alerts import send_red_alert
+from stimuli import create_session, get_session, compute_actual_engagement
 
 load_dotenv()
 
@@ -35,6 +36,20 @@ class AlertRequest(BaseModel):
     score: float
     level: str        # "green" | "yellow" | "red"
     intervention: str
+
+
+class StartSessionRequest(BaseModel):
+    user_id: str
+
+
+class ReactRequest(BaseModel):
+    user_id: str
+    session_id: str
+    stimulus_id: str
+    response_text: str
+    response_time_ms: float
+    typing_wpm: float
+    error_rate: float
 
 
 @app.get("/health")
@@ -105,6 +120,89 @@ def alert(req: AlertRequest):
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Twilio error: {str(e)}")
+
+
+@app.post("/stimuli/start")
+def start_session(req: StartSessionRequest):
+    session = create_session(req.user_id)
+    stimulus = session.current_stimulus()
+    return {
+        "session_id": session.session_id,
+        "total_stimuli": len(session.stimuli),
+        "stimulus_number": 1,
+        "stimulus": stimulus,
+    }
+
+
+@app.post("/stimuli/react")
+async def react_to_stimulus(req: ReactRequest):
+    session = get_session(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session {req.session_id} not found")
+    if session.complete:
+        raise HTTPException(status_code=400, detail="Session already complete")
+
+    current = session.current_stimulus()
+    if current["id"] != req.stimulus_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Expected stimulus {current['id']}, got {req.stimulus_id}",
+        )
+
+    sentiment = analyze_sentiment(req.response_text)
+    typing    = analyze_typing(req.typing_wpm, req.error_rate)
+    temporal  = analyze_temporal(req.response_time_ms)
+    linguistic = analyze_linguistic(req.response_text)
+
+    actual_engagement   = compute_actual_engagement(sentiment, typing, temporal)
+    tribe_expected      = current["tribe_expected_engagement"]
+    deviation           = round(abs(tribe_expected - actual_engagement), 3)
+
+    reaction = {
+        "stimulus_id":               req.stimulus_id,
+        "stimulus_valence":          current["valence"],
+        "tribe_expected_engagement": tribe_expected,
+        "actual_engagement":         actual_engagement,
+        "deviation":                 deviation,
+        "behavioral_signals": {
+            "sentiment":  sentiment,
+            "typing":     typing,
+            "temporal":   temporal,
+            "linguistic": linguistic,
+        },
+    }
+
+    session.record_reaction(reaction)
+    next_stimulus = session.current_stimulus()
+
+    return {
+        "reaction_recorded":         True,
+        "stimulus_id":               req.stimulus_id,
+        "tribe_expected_engagement": tribe_expected,
+        "actual_engagement":         actual_engagement,
+        "deviation":                 deviation,
+        "session_complete":          session.complete,
+        "stimulus_number":           session.current_index,
+        "total_stimuli":             len(session.stimuli),
+        "next_stimulus":             next_stimulus,
+    }
+
+
+@app.get("/stimuli/results/{session_id}")
+def session_results(session_id: str):
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    return {
+        "session_id":     session_id,
+        "user_id":        session.user_id,
+        "complete":       session.complete,
+        "stimuli_count":  len(session.stimuli),
+        "reactions_count": len(session.reactions),
+        "mean_deviation": session.mean_deviation(),
+        "burnout_score":  session.burnout_score(),
+        "reactions":      session.reactions,
+    }
 
 
 if __name__ == "__main__":
