@@ -1,0 +1,11 @@
+⚠️ Pegasus Check-In Reminder
+
+Hey {user_id}, your burnout signal is at YELLOW (score: {score}/100).
+
+Things are trending in a direction worth paying attention to.
+
+Suggested action: {intervention}
+
+Take a moment. You don't have to fix everything today.
+
+— Pegasus Mental Health Monitor
