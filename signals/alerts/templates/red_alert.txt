@@ -1,0 +1,9 @@
+🚨 Pegasus Burnout Alert
+
+Hi {user_id}, your burnout signal just hit RED (score: {score}/100).
+
+Recommended action: {intervention}
+
+Please take a break or reach out to your manager. You matter.
+
+— Pegasus Mental Health Monitor
