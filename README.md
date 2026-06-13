@@ -9,7 +9,8 @@ behavioral signal → 🟢/🟡/🔴 + a Claude intervention → SMS alert if re
 frontend (Wesley)  React          :3000   ── talks only to backend
 backend  (Jason)   FastAPI+SQLite :8001   ── orchestrator, fans out ↓
 signals  (Dhruva)  FastAPI        :8002   ── sentiment + typing + Twilio
-ml       (Rishith) FastAPI+TRIBE  :8003   ── predict · score · intervention
+ml       (Rishith) FastAPI+TRIBE  :8003   ── predict · combined 4-stream score
+video    (Rishith) MediaPipe+Whisper :8004 ── facial + voice stress (check-in)
 imessage (TBD)     AppleScript + chat.db   ── optional iMessage delivery (macOS)
 ```
 

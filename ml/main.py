@@ -1,30 +1,32 @@
-"""Pegasus ML service — TRIBE v2 prediction, deviation scoring, intervention.
+"""Pegasus ML service (:8003) — TRIBE v2 prediction + combined burnout scoring.
 
-Run (from repo root or from /ml):
-    uvicorn main:app --reload --port 8003   # from inside /ml
+Run (from inside /ml):
+    uvicorn main:app --reload --port 8003
+
+Endpoints:
+    GET  /health
+    POST /predict          TRIBE v2 healthy-brain prediction for a stimulus
+    GET  /baseline/{sid}   cached prediction for a stimulus_id
+    POST /score            merge all signal streams -> burnout_result
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from intervention import generate_intervention
-from scoring import compute_score
-from tribe import TribePredictor
+from combined_scorer import compute_final_score
+from scoring import compute_tribe_deviation
+from tribe_inference import TribeModel
 
-app = FastAPI(title="Pegasus ML", version="0.1.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
-)
+app = FastAPI(title="Pegasus ML", version="0.2.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-predictor = TribePredictor()
+model = TribeModel()
 
 
-# --- request models (mirror shared/contract.md) ---------------------------
 class StimulusIn(BaseModel):
     stimulus_id: str = "demo"
     type: str = "text"
@@ -37,36 +39,49 @@ class PredictIn(BaseModel):
 
 
 class ScoreIn(BaseModel):
-    stimulus: StimulusIn
-    prediction: Dict
-    signal: Dict
-    checkin: Dict
-
-
-class InterventionIn(BaseModel):
-    burnout: Dict
-    recent_signals: Optional[List[Dict]] = None
+    """All signal streams. Any may be omitted — the scorer renormalizes over
+    whatever is present (e.g. a text-only check-in has no facial/voice)."""
+    user_id: str = "demo"
+    stimulus: Optional[StimulusIn] = None
+    imessage_signals: Optional[Dict] = None
+    typing_biometrics: Optional[Dict] = None
+    facial_analysis: Optional[Dict] = None
+    voice_analysis: Optional[Dict] = None
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": predictor.model_name}
+    return {"status": "ok", "model": model.model_name}
 
 
 @app.post("/predict")
 def predict(body: PredictIn):
-    return predictor.predict(body.stimulus.model_dump())
+    return model.predict(body.stimulus.model_dump())
+
+
+@app.get("/baseline/{stimulus_id}")
+def baseline(stimulus_id: str):
+    b = model.baseline(stimulus_id)
+    if not b:
+        raise HTTPException(404, "no cached baseline for that stimulus_id")
+    return b
 
 
 @app.post("/score")
 def score(body: ScoreIn):
-    pred = body.prediction or predictor.predict(body.stimulus.model_dump())
-    return compute_score(pred, body.signal, body.checkin)
-
-
-@app.post("/intervention")
-def intervention(body: InterventionIn):
-    return generate_intervention(body.burnout, body.recent_signals)
+    tribe_dev = None
+    if body.stimulus is not None:
+        b = model.predict(body.stimulus.model_dump())
+        tribe_dev = compute_tribe_deviation(b, body.imessage_signals)
+    result = compute_final_score(
+        imessage=body.imessage_signals,
+        typing=body.typing_biometrics,
+        facial=body.facial_analysis,
+        voice=body.voice_analysis,
+        tribe_deviation=tribe_dev,
+    )
+    result["user_id"] = body.user_id
+    return result
 
 
 if __name__ == "__main__":

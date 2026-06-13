@@ -28,6 +28,9 @@ RUN=1
 py_service ml      ml      8003
 py_service signals signals 8002
 py_service backend backend 8001
+# Video service is opt-in: heavy installs (mediapipe/whisper/ffmpeg).
+#   WITH_VIDEO=1 ./dev.sh
+[ "${WITH_VIDEO:-0}" = "1" ] && py_service video video 8004
 
 pushd frontend >/dev/null
 [ -d node_modules ] || npm install

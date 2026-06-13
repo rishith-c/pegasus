@@ -16,7 +16,8 @@ intervention → SMS alert if red.
 | `frontend/` | Wesley  | React (Vite)       | 3000 |
 | `backend/`  | Jason   | FastAPI + SQLite   | 8001 |
 | `signals/`  | Dhruva  | FastAPI            | 8002 |
-| `ml/`       | Rishith | FastAPI + TRIBE v2 | 8003 |
+| `ml/`       | Rishith | FastAPI + TRIBE v2 + combined scorer | 8003 |
+| `video/`    | Rishith | FastAPI + MediaPipe + Whisper        | 8004 |
 | `shared/`   | Jason   | API contract       | —    |
 | `imessage/` | TBD     | macOS iMessage bridge (AppleScript + chat.db) | — |
 
