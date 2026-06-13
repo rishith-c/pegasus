@@ -180,10 +180,10 @@ async def send_checkin(req: CheckinRequest):
 
 @app.post("/sms/webhook")
 async def sms_webhook(request: Request):
-    """Twilio inbound SMS webhook — point your Twilio number here."""
-    form        = await request.form()
-    from_number = form.get("From", "")
-    body        = form.get("Body", "")
+    """Bloo.io inbound SMS webhook — register this URL in Bloo.io dashboard."""
+    payload     = await request.json()
+    from_number = payload.get("from") or payload.get("sender") or payload.get("phone", "")
+    body        = payload.get("text") or payload.get("body") or payload.get("message", "")
     return await handle_incoming_sms(from_number, body)
 
 
