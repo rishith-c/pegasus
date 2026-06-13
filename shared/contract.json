@@ -38,7 +38,7 @@
     "tribe_deviation": "number",
     "behavioral_deviation": "number",
     "top_indicators": ["string"],
-    "intervention": "string",
+    "intervention": "string (Claude-generated via ML; warm, actionable, non-diagnostic)",
     "brain_regions_flagged": ["string"],
     "confidence": "0-1",
     "breakdown": {
@@ -48,6 +48,8 @@
       "voice": "number (video voice stress 0-100, 0 if no video)",
       "tribe": "number (TRIBE deviation contribution 0-100)"
     },
+    "support": "[{name, contact, type}] human-support resources; populated ONLY on red (PRD §6: red always routes to human support)",
+    "source": "app|sms|video|tribe|fallback",
     "timestamp": "ISO8601"
   },
   "endpoints": {
@@ -60,7 +62,7 @@
       "GET /history/{user_id}": "-> [burnout_result, ...] (most recent first, up to 30)",
       "GET /metrics/{user_id}": "-> { score_trend, latest_breakdown, total_checkins }",
       "GET /brain/{user_id}": "-> { regions, ... } TRIBE brain data for the latest stimulus",
-      "POST /video/submit": "multipart (video, user_id) -> video analysis result"
+      "POST /video/submit": "multipart (video, user_id) -> { facial, voice, combined_score, burnout_result } — fuses facial/voice into a burnout score (PRD 4.5); raw video is never stored"
     },
     "signals (8002, owner: dhruva)": {
       "POST /analyze": "{ user_id, response_text, response_time_ms, typing_wpm, error_rate, [+optional keystroke biometrics: hesitation_count, burst_pattern, avg_key_hold_ms, flight_time_ms, correction_loops] } -> FLAT { sentiment_score, energy_level, combined_signal_score, linguistic_flags, typing_stress_score, future_tense_pct, self_referential_pct, hedging_count, flat_affect, word_count, ..., detail{sentiment,typing,temporal,linguistic} }",
@@ -76,7 +78,7 @@
       "GET /baseline/{stimulus_id}": "-> { regions, ... } TRIBE baseline brain activation"
     },
     "video (8004, owner: rishith)": {
-      "POST /analyze/video": "multipart video (field name 'video') -> { facial: {facial_stress_score, ...}, voice: {...}, combined_score: number }"
+      "POST /analyze/video": "multipart video (field name 'video') -> { facial: {facial_stress_score, ...}, voice: {voice_stress_score, ...}, combined_score: number }"
     }
   },
   "notes": "Backend keeps a graceful-fallback layer: if signals (8002) or ML (8003) are offline, /response/submit returns a degraded burnout_result (source='fallback') instead of erroring, so the app + SMS bot keep working during the demo."

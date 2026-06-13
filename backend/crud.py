@@ -78,6 +78,28 @@ def score_trend(db: Session, user_id: str) -> list[ScoreRecord]:
     )
 
 
+def latest_video(db: Session, user_id: str) -> VideoRecord | None:
+    return (
+        db.query(VideoRecord)
+        .filter(VideoRecord.user_id == user_id)
+        .order_by(VideoRecord.timestamp.desc(), VideoRecord.id.desc())
+        .first()
+    )
+
+
+def video_signals_for(db: Session, user_id: str) -> dict | None:
+    """Normalized latest facial/voice signals for fusion, or None if no video yet."""
+    rec = latest_video(db, user_id)
+    if rec is None:
+        return None
+    voice = rec.voice_data or {}
+    return {
+        "facial_score": rec.facial_score or 0,
+        "voice_score": voice.get("voice_stress_score", voice.get("stress_score", 0)) or 0,
+        "combined_score": rec.combined_score or 0,
+    }
+
+
 def save_video(
     db: Session,
     user_id: str,

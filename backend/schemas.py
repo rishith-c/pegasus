@@ -35,5 +35,6 @@ class BurnoutResult(BaseModel):
     brain_regions_flagged: list[str] = []
     confidence: float = 0.0
     breakdown: Breakdown = Breakdown()
-    source: Optional[str] = None
+    support: list[dict] = []  # human-support resources, populated on red (PRD §6)
+    source: Optional[str] = None  # "app" | "sms" | "video" | "tribe" | "fallback"
     timestamp: Optional[str] = None

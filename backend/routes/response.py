@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 import crud
+import safety
 from models.database import get_db
 from schemas import ResponseSubmitRequest
 from services import ml_client, scoring, signal_client, stimuli
@@ -22,6 +23,7 @@ log = logging.getLogger("pegasus.backend")
 async def submit_response(data: ResponseSubmitRequest, db: Session = Depends(get_db)):
     crud.ensure_user(db, data.user_id)
     stimulus = stimuli.get_stimulus(data.stimulus_id)
+    video = crud.video_signals_for(db, data.user_id)  # latest facial/voice, if any
     raw = {
         "response_text": data.response_text,
         "response_time_ms": data.response_time_ms,
@@ -57,13 +59,18 @@ async def submit_response(data: ResponseSubmitRequest, db: Session = Depends(get
         "error_rate": data.error_rate,
         "response_time_ms": data.response_time_ms,
         "response_latency_ms": data.response_latency_ms,
+        "facial_score": (video or {}).get("facial_score"),
+        "voice_score": (video or {}).get("voice_score"),
     }
     try:
         ml_result = await ml_client.score(data.user_id, data.stimulus_id, ml_signals)
-        result = scoring.normalize_ml_result(ml_result, stimulus, analysis, raw)
+        result = scoring.normalize_ml_result(ml_result, stimulus, analysis, raw, video)
     except Exception as exc:  # noqa: BLE001 - degrade gracefully
         log.warning("ML service unavailable, using fallback scoring: %s", exc)
-        result = scoring.fallback_score(stimulus, analysis, raw)
+        result = scoring.fallback_score(stimulus, analysis, raw, video)
+
+    # Safety invariant: a red result always carries a human-support path (PRD §6).
+    result = safety.ensure_human_support(result)
 
     # 3) Persist.
     rec = crud.save_score(db, data.user_id, data.stimulus_id, result, data.source)

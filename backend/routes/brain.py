@@ -24,16 +24,20 @@ async def get_brain(user_id: str, db: Session = Depends(get_db)):
         baseline["user_id"] = user_id
         baseline["stimulus_id"] = rec.stimulus_id
         baseline.setdefault("source", "tribe")
+        if baseline.get("brain_regions_flagged") and "explanations" not in baseline:
+            baseline["explanations"] = scoring.region_explanations(baseline["brain_regions_flagged"])
         return baseline
     except Exception as exc:  # noqa: BLE001 - degrade gracefully
         log.warning("ML baseline unavailable, synthesizing brain map: %s", exc)
         flagged, regions = scoring.synth_brain(rec.level, rec.score)
+        flagged = rec.brain_regions_flagged or flagged
         return {
             "user_id": user_id,
             "stimulus_id": rec.stimulus_id,
             "level": rec.level,
             "score": rec.score,
             "regions": regions,
-            "brain_regions_flagged": rec.brain_regions_flagged or flagged,
+            "brain_regions_flagged": flagged,
+            "explanations": scoring.region_explanations(flagged),
             "source": "fallback",
         }

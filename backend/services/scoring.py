@@ -1,9 +1,10 @@
 """Backend-side scoring fallback + result normalization.
 
 When Rishith's ML service (8003) is up, we use its burnout_result directly
-(normalize_ml_result). When it is offline, fallback_score produces a principled
-burnout_result from the signals analysis + the stimulus category baseline, so the
-backend is independently demoable. Both paths emit the contract `breakdown`.
+(normalize_ml_result). When it is offline, the local fallbacks produce a
+principled burnout_result from the available signals, so the backend is
+independently demoable. Both paths emit the contract `breakdown`
+{imessage, typing, facial, voice, tribe} (PRD §4.5 fusion).
 """
 from config import RED_THRESHOLD, YELLOW_THRESHOLD
 
@@ -26,15 +27,26 @@ _ATLAS = [
     "hippocampus",
 ]
 
+# Plain-English, non-clinical descriptions for the Brain screen (PRD §5.2).
+_REGION_EXPLANATIONS = {
+    "amygdala": "threat & emotional reactivity — tends to run hot when stress is high",
+    "anterior cingulate cortex": "conflict monitoring & emotional regulation — works harder under sustained strain",
+    "insula": "body awareness — tracks discomfort, tension, and fatigue",
+    "dorsolateral prefrontal cortex": "focus & self-control — dips when you're cognitively depleted",
+    "medial prefrontal cortex": "self-reflection & calm baseline — active when you feel settled",
+    "posterior cingulate cortex": "rest & mind-wandering — part of the calm 'default' network",
+    "ventral striatum": "reward & motivation — quiets down when drive is low",
+    "hippocampus": "memory & context — sensitive to chronic stress",
+}
+
 _INTERVENTIONS = {
     "green": "Your signals look steady today. Keep doing what works — a short walk "
              "or a moment of gratitude can lock in the good momentum.",
     "yellow": "Some early strain is showing. Try a 5-minute breathing break, step away "
               "from the screen, and protect one boundary today (decline one nonessential "
               "meeting).",
-    "red": "Your signals point to significant strain. Please pause — take 15 minutes away "
-           "from work, reach out to someone you trust, and consider one thing you can take "
-           "off your plate today. You don't have to push through alone.",
+    "red": "Your signals point to significant strain. Please pause and step away from "
+           "work for a bit, and take one thing off your plate today.",
 }
 
 
@@ -50,13 +62,25 @@ def _intervention(level: str) -> str:
     return _INTERVENTIONS.get(level, _INTERVENTIONS["yellow"])
 
 
+def region_explanations(regions: list[str]) -> dict:
+    return {r: _REGION_EXPLANATIONS.get(r, "involved in processing this stimulus") for r in regions or []}
+
+
 def _expected_engagement(stimulus: dict | None) -> float:
     if not stimulus:
         return 0.5
-    # New contract stimuli use `category`; legacy/SMS stimuli carry an explicit baseline.
     if "tribe_expected_engagement" in stimulus:
         return float(stimulus["tribe_expected_engagement"])
     return _CATEGORY_EXPECTED.get(stimulus.get("category"), 0.5)
+
+
+def _video_signals(video: dict | None) -> tuple[float, float]:
+    """(facial 0-100, voice 0-100) from a normalized video-signal dict."""
+    if not video:
+        return 0.0, 0.0
+    facial = float(video.get("facial_score") or 0)
+    voice = float(video.get("voice_score") or 0)
+    return round(min(100.0, facial), 1), round(min(100.0, voice), 1)
 
 
 def synth_brain(level: str, score: int):
@@ -81,22 +105,22 @@ def _typing_burnout(raw: dict) -> float:
     """0-100 typing-biometrics burnout contribution from raw signals."""
     err = float(raw.get("error_rate") or 0)
     wpm = float(raw.get("typing_wpm") or 0)
-    val = min(60.0, err)              # backspace-heavy typing
+    val = min(60.0, err)
     if 0 < wpm < 20:
-        val += 25                     # very slow typing
+        val += 25
     elif wpm > 120:
-        val += 10                     # frantic typing
+        val += 10
     return round(min(100.0, val), 1)
 
 
-def _breakdown(analysis: dict, raw: dict, tribe_dev: float) -> dict:
-    """Per-stream burnout contributions (0-100). Facial/voice come from video only."""
+def _breakdown(analysis: dict, raw: dict, tribe_dev: float, facial: float = 0.0, voice: float = 0.0) -> dict:
+    """Per-stream burnout contributions (0-100), the PRD §4.5 fusion inputs."""
     sentiment = float(analysis.get("sentiment_score", 0.5))
     return {
         "imessage": round(min(100.0, (1 - sentiment) * 100), 1),
         "typing": _typing_burnout(raw),
-        "facial": 0.0,
-        "voice": 0.0,
+        "facial": round(facial, 1),
+        "voice": round(voice, 1),
         "tribe": round(min(100.0, tribe_dev * 100), 1),
     }
 
@@ -155,14 +179,19 @@ def local_analysis(raw: dict) -> dict:
     }
 
 
-def fallback_score(stimulus: dict | None, analysis: dict, raw: dict) -> dict:
-    """Compute a burnout_result locally from signals + the stimulus baseline."""
+def fallback_score(stimulus: dict | None, analysis: dict, raw: dict, video: dict | None = None) -> dict:
+    """Score a text/typing pulse-check locally from signals + the stimulus baseline.
+
+    `video` (latest known facial/voice for the user) is surfaced in the breakdown
+    for continuity but does not move a text-channel score.
+    """
     expected = _expected_engagement(stimulus)
     combined = float(analysis.get("combined_signal_score", 50)) / 100.0  # 0-1 burnout
     actual_engagement = max(0.0, min(1.0, 1 - combined))
 
     tribe_dev = round(abs(expected - actual_engagement), 3)
     behavioral_dev = round(combined, 3)
+    facial, voice = _video_signals(video)
 
     score = int(round(100 * (0.6 * behavioral_dev + 0.4 * tribe_dev)))
     score = max(0, min(100, score))
@@ -178,13 +207,69 @@ def fallback_score(stimulus: dict | None, analysis: dict, raw: dict) -> dict:
         "intervention": _intervention(level),
         "brain_regions_flagged": flagged,
         "brain_regions": regions,
-        "breakdown": _breakdown(analysis, raw, tribe_dev),
+        "breakdown": _breakdown(analysis, raw, tribe_dev, facial, voice),
         "confidence": 0.55 if analysis.get("_local") else 0.7,
         "source": "fallback",
     }
 
 
-def normalize_ml_result(result: dict, stimulus: dict | None, analysis: dict, raw: dict) -> dict:
+def video_fallback_score(video: dict, prior: dict | None = None) -> dict:
+    """Fuse a video check-in into a burnout score (PRD §4.5, facial weighted highest).
+
+    `prior` is the user's most recent burnout_result (for behavioral/text context).
+    """
+    facial, voice = _video_signals(video)
+    video_burden = (0.6 * facial + 0.4 * voice) / 100.0  # facial weighted highest
+
+    prior = prior or {}
+    prior_beh = float(prior.get("behavioral_deviation") or 0.0)
+    prior_bd = prior.get("breakdown") or {}
+
+    score = int(round(100 * (0.65 * video_burden + 0.35 * prior_beh)))
+    score = max(0, min(100, score))
+    level = level_for(score)
+
+    indicators: list[str] = []
+    if facial >= 65:
+        indicators.append("strained facial expression")
+    elif facial >= 40:
+        indicators.append("facial tension")
+    if voice >= 65:
+        indicators.append("flat or strained voice")
+    elif voice >= 40:
+        indicators.append("vocal stress")
+    if not indicators:
+        indicators = ["relaxed facial & vocal signals"] if level == "green" else ["elevated facial/vocal strain"]
+
+    flagged, regions = _brain(level, score)
+    return {
+        "score": score,
+        "level": level,
+        "tribe_deviation": float(prior.get("tribe_deviation") or 0.0),
+        "behavioral_deviation": round(video_burden, 3),
+        "top_indicators": indicators[:5],
+        "intervention": _intervention(level),
+        "brain_regions_flagged": flagged,
+        "brain_regions": regions,
+        "breakdown": {
+            "imessage": prior_bd.get("imessage", 0.0),
+            "typing": prior_bd.get("typing", 0.0),
+            "facial": round(facial, 1),
+            "voice": round(voice, 1),
+            "tribe": prior_bd.get("tribe", 0.0),
+        },
+        "confidence": 0.6,
+        "source": "fallback",
+    }
+
+
+def normalize_ml_result(
+    result: dict,
+    stimulus: dict | None,
+    analysis: dict,
+    raw: dict,
+    video: dict | None = None,
+) -> dict:
     """Coerce the ML service's burnout_result into our stored shape.
 
     Tolerates missing fields and synthesizes brain_regions / breakdown if absent.
@@ -202,7 +287,8 @@ def normalize_ml_result(result: dict, stimulus: dict | None, analysis: dict, raw
         flagged = [k for k, _ in sorted(regions.items(), key=lambda kv: -kv[1])[:3]]
 
     tribe_dev = float(result.get("tribe_deviation", 0.0))
-    breakdown = result.get("breakdown") or _breakdown(analysis, raw, tribe_dev)
+    facial, voice = _video_signals(video)
+    breakdown = result.get("breakdown") or _breakdown(analysis, raw, tribe_dev, facial, voice)
 
     return {
         "score": score,
