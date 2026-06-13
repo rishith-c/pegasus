@@ -72,7 +72,7 @@
       "GET /baseline/{stimulus_id}": "-> { regions, ... } TRIBE baseline brain activation"
     },
     "video (8004, owner: rishith)": {
-      "POST /analyze/video": "multipart video -> { facial: {...}, voice: {...} }"
+      "POST /analyze/video": "multipart video (field name 'video') -> { facial: {facial_stress_score, ...}, voice: {...}, combined_score: number }"
     }
   },
   "notes": "Backend keeps a graceful-fallback layer: if signals (8002) or ML (8003) are offline, /response/submit returns a degraded burnout_result (source='fallback') instead of erroring, so the app + SMS bot keep working during the demo."

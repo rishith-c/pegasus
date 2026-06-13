@@ -12,6 +12,7 @@ class VideoRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, index=True)
     facial_score = Column(Integer, default=0)
+    combined_score = Column(Integer, default=0)
     facial_data = Column(JSON, default=dict)
     voice_data = Column(JSON, default=dict)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -20,6 +21,7 @@ class VideoRecord(Base):
         return {
             "user_id": self.user_id,
             "facial_score": self.facial_score,
+            "combined_score": self.combined_score,
             "facial": self.facial_data or {},
             "voice": self.voice_data or {},
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,

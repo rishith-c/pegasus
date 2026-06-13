@@ -36,7 +36,8 @@ async def submit_video(
     facial = result.get("facial", {}) or {}
     voice = result.get("voice", {}) or {}
     facial_score = int(facial.get("facial_stress_score", 0) or 0)
-    crud.save_video(db, user_id, facial_score, facial, voice)
+    combined_score = int(result.get("combined_score", 0) or 0)
+    crud.save_video(db, user_id, facial_score, combined_score, facial, voice)
 
     result["video_service"] = video_ok
     return result

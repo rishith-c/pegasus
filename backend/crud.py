@@ -78,10 +78,18 @@ def score_trend(db: Session, user_id: str) -> list[ScoreRecord]:
     )
 
 
-def save_video(db: Session, user_id: str, facial_score: int, facial_data: dict, voice_data: dict) -> VideoRecord:
+def save_video(
+    db: Session,
+    user_id: str,
+    facial_score: int,
+    combined_score: int,
+    facial_data: dict,
+    voice_data: dict,
+) -> VideoRecord:
     rec = VideoRecord(
         user_id=user_id,
         facial_score=facial_score,
+        combined_score=combined_score,
         facial_data=facial_data,
         voice_data=voice_data,
     )
