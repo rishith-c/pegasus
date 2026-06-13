@@ -1,26 +1,26 @@
-"""POST /stimulus/send and GET /stimuli."""
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+"""Stimulus selection + delivery (prefix /stimulus)."""
+from fastapi import APIRouter, HTTPException
 
-import crud
-from models.database import get_db
-from schemas import StimulusSendRequest
 from services import stimuli
 
-router = APIRouter(tags=["stimulus"])
+router = APIRouter()
 
 
-@router.post("/stimulus/send")
-def send_stimulus(req: StimulusSendRequest, db: Session = Depends(get_db)):
-    stimulus = stimuli.get_stimulus(req.stimulus_id)
-    if stimulus is None:
-        raise HTTPException(status_code=404, detail=f"Unknown stimulus_id '{req.stimulus_id}'")
-    crud.ensure_user(db, req.user_id)
-    crud.record_session(db, req.user_id, req.stimulus_id)
-    return {"user_id": req.user_id, "stimulus": stimulus}
+@router.get("/today/{user_id}")
+def get_today_stimulus(user_id: str):
+    """Return today's stimulus for a user (stable daily rotation)."""
+    return stimuli.stimulus_for_today(user_id)
 
 
-@router.get("/stimuli")
-def list_stimuli():
+@router.get("/all")
+def get_all_stimuli():
     items = stimuli.all_stimuli()
     return {"count": len(items), "stimuli": items}
+
+
+@router.get("/{stimulus_id}")
+def get_stimulus(stimulus_id: str):
+    s = stimuli.get_stimulus(stimulus_id)
+    if s is None:
+        raise HTTPException(status_code=404, detail=f"Unknown stimulus_id '{stimulus_id}'")
+    return s

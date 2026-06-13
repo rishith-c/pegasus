@@ -9,14 +9,16 @@ load_dotenv()
 BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8001"))
 
 # Downstream services we orchestrate.
-SIGNAL_SERVICE_URL = os.getenv("SIGNAL_SERVICE_URL", "http://localhost:8002")
-ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
+SIGNAL_SERVICE = os.getenv("SIGNAL_SERVICE_URL", "http://localhost:8002")
+ML_SERVICE = os.getenv("ML_SERVICE_URL", "http://localhost:8003")
+VIDEO_SERVICE = os.getenv("VIDEO_SERVICE_URL", "http://localhost:8004")
 
 # Persistence.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pegasus.db")
 
-# HTTP timeout (seconds) for calls to downstream services.
-SERVICE_TIMEOUT = float(os.getenv("SERVICE_TIMEOUT", "10.0"))
+# HTTP timeouts (seconds) for calls to downstream services.
+SERVICE_TIMEOUT = float(os.getenv("SERVICE_TIMEOUT", "15.0"))
+VIDEO_TIMEOUT = float(os.getenv("VIDEO_TIMEOUT", "120.0"))
 
 # Path to the shared/ folder (canonical contract + stimulus manifest).
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))

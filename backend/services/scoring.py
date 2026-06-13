@@ -2,13 +2,14 @@
 
 When Rishith's ML service (8003) is up, we use its burnout_result directly
 (normalize_ml_result). When it is offline, fallback_score produces a principled
-burnout_result from the signals analysis + the stimulus TRIBE baseline, so the
-backend is independently demoable.
+burnout_result from the signals analysis + the stimulus category baseline, so the
+backend is independently demoable. Both paths emit the contract `breakdown`.
 """
 from config import RED_THRESHOLD, YELLOW_THRESHOLD
 
-# Named regions we surface as "flagged" per level, plus a small atlas we
-# synthesize activations over for the brain heatmap.
+# A healthy brain is expected to engage more with activating content than calm.
+_CATEGORY_EXPECTED = {"calm": 0.45, "neutral": 0.50, "activating": 0.72}
+
 _ACTIVE_REGIONS = {
     "green": ["medial prefrontal cortex", "posterior cingulate cortex"],
     "yellow": ["anterior cingulate cortex", "insula", "dorsolateral prefrontal cortex"],
@@ -49,6 +50,20 @@ def _intervention(level: str) -> str:
     return _INTERVENTIONS.get(level, _INTERVENTIONS["yellow"])
 
 
+def _expected_engagement(stimulus: dict | None) -> float:
+    if not stimulus:
+        return 0.5
+    # New contract stimuli use `category`; legacy/SMS stimuli carry an explicit baseline.
+    if "tribe_expected_engagement" in stimulus:
+        return float(stimulus["tribe_expected_engagement"])
+    return _CATEGORY_EXPECTED.get(stimulus.get("category"), 0.5)
+
+
+def synth_brain(level: str, score: int):
+    """Public: synthesized (flagged_regions, regions) for the brain-view fallback."""
+    return _brain(level, score)
+
+
 def _brain(level: str, score: int):
     """Return (flagged_regions, {region: activation 0-1}) synthesized from score."""
     flagged = _ACTIVE_REGIONS.get(level, _ACTIVE_REGIONS["yellow"])
@@ -60,6 +75,30 @@ def _brain(level: str, score: int):
         else:
             regions[r] = round(max(0.0, 0.35 - base * 0.2), 3)
     return flagged, regions
+
+
+def _typing_burnout(raw: dict) -> float:
+    """0-100 typing-biometrics burnout contribution from raw signals."""
+    err = float(raw.get("error_rate") or 0)
+    wpm = float(raw.get("typing_wpm") or 0)
+    val = min(60.0, err)              # backspace-heavy typing
+    if 0 < wpm < 20:
+        val += 25                     # very slow typing
+    elif wpm > 120:
+        val += 10                     # frantic typing
+    return round(min(100.0, val), 1)
+
+
+def _breakdown(analysis: dict, raw: dict, tribe_dev: float) -> dict:
+    """Per-stream burnout contributions (0-100). Facial/voice come from video only."""
+    sentiment = float(analysis.get("sentiment_score", 0.5))
+    return {
+        "imessage": round(min(100.0, (1 - sentiment) * 100), 1),
+        "typing": _typing_burnout(raw),
+        "facial": 0.0,
+        "voice": 0.0,
+        "tribe": round(min(100.0, tribe_dev * 100), 1),
+    }
 
 
 def _indicators(analysis: dict, raw: dict, level: str) -> list[str]:
@@ -81,7 +120,6 @@ def _indicators(analysis: dict, raw: dict, level: str) -> list[str]:
     if not out:
         out = ["healthy engagement"] if level == "green" else ["elevated stress signals"]
 
-    # De-dupe, preserve order, cap at 5.
     seen, deduped = set(), []
     for item in out:
         if item not in seen:
@@ -91,22 +129,18 @@ def _indicators(analysis: dict, raw: dict, level: str) -> list[str]:
 
 
 def local_analysis(raw: dict) -> dict:
-    """Last-resort analysis when the signals service is ALSO offline.
-
-    Derives a crude combined_signal_score (0-100, higher = more burnout) from the
-    raw behavioral metrics only.
-    """
+    """Last-resort analysis when the signals service is ALSO offline."""
     err = float(raw.get("error_rate") or 0)
     wpm = float(raw.get("typing_wpm") or 0)
     rt = float(raw.get("response_time_ms") or 0)
 
-    combined = min(35.0, err)            # backspace-heavy typing
+    combined = min(35.0, err)
     if 0 < wpm < 20:
-        combined += 20                   # very slow typing
+        combined += 20
     elif wpm > 120:
-        combined += 10                   # frantic typing
+        combined += 10
     if rt > 60000:
-        combined += 20                   # took over a minute
+        combined += 20
     elif rt > 30000:
         combined += 10
     combined = min(100.0, combined)
@@ -122,8 +156,8 @@ def local_analysis(raw: dict) -> dict:
 
 
 def fallback_score(stimulus: dict | None, analysis: dict, raw: dict) -> dict:
-    """Compute a burnout_result locally from signals + the TRIBE baseline."""
-    expected = float(stimulus["tribe_expected_engagement"]) if stimulus else 0.5
+    """Compute a burnout_result locally from signals + the stimulus baseline."""
+    expected = _expected_engagement(stimulus)
     combined = float(analysis.get("combined_signal_score", 50)) / 100.0  # 0-1 burnout
     actual_engagement = max(0.0, min(1.0, 1 - combined))
 
@@ -144,16 +178,16 @@ def fallback_score(stimulus: dict | None, analysis: dict, raw: dict) -> dict:
         "intervention": _intervention(level),
         "brain_regions_flagged": flagged,
         "brain_regions": regions,
+        "breakdown": _breakdown(analysis, raw, tribe_dev),
         "confidence": 0.55 if analysis.get("_local") else 0.7,
         "source": "fallback",
     }
 
 
-def normalize_ml_result(result: dict, stimulus: dict | None) -> dict:
+def normalize_ml_result(result: dict, stimulus: dict | None, analysis: dict, raw: dict) -> dict:
     """Coerce the ML service's burnout_result into our stored shape.
 
-    Tolerates missing fields and synthesizes a brain_regions map if the ML
-    service did not return one.
+    Tolerates missing fields and synthesizes brain_regions / breakdown if absent.
     """
     score = max(0, min(100, int(round(float(result.get("score", 0))))))
     level = result.get("level") or level_for(score)
@@ -167,15 +201,19 @@ def normalize_ml_result(result: dict, stimulus: dict | None) -> dict:
     elif not flagged:
         flagged = [k for k, _ in sorted(regions.items(), key=lambda kv: -kv[1])[:3]]
 
+    tribe_dev = float(result.get("tribe_deviation", 0.0))
+    breakdown = result.get("breakdown") or _breakdown(analysis, raw, tribe_dev)
+
     return {
         "score": score,
         "level": level,
-        "tribe_deviation": float(result.get("tribe_deviation", 0.0)),
+        "tribe_deviation": tribe_dev,
         "behavioral_deviation": float(result.get("behavioral_deviation", 0.0)),
         "top_indicators": result.get("top_indicators") or [],
         "intervention": result.get("intervention") or _intervention(level),
         "brain_regions_flagged": flagged,
         "brain_regions": regions,
+        "breakdown": breakdown,
         "confidence": float(result.get("confidence", 0.8)),
         "source": "tribe",
     }

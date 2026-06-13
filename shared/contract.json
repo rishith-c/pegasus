@@ -1,12 +1,13 @@
 {
-  "version": "1.1.0",
+  "version": "2.0.0",
   "owner": "jason (backend)",
-  "description": "Pegasus API contract. Jason owns this file. If you need a field, tell Jason.",
+  "description": "Pegasus API contract. Jason owns this file. Need a field changed? Tell Jason, he updates it, everyone pulls.",
   "services": {
     "frontend": "http://localhost:3000",
     "backend": "http://localhost:8001",
     "signals": "http://localhost:8002",
-    "ml": "http://localhost:8003"
+    "ml": "http://localhost:8003",
+    "video": "http://localhost:8004"
   },
   "levels": {
     "green": "score < 30",
@@ -15,54 +16,64 @@
   },
   "stimulus": {
     "id": "string",
-    "type": "scenario|word|task",
-    "valence": "positive|negative|neutral",
-    "tribe_expected_engagement": "number (0-1), TRIBE v2 predicted engagement for a healthy brain",
-    "content": "string, the stimulus text shown to the user",
-    "prompt": "string, instruction for how the user should respond"
+    "type": "image|audio|text",
+    "url": "string",
+    "category": "calm|neutral|activating",
+    "prompt": "string"
   },
   "user_response": {
     "user_id": "string",
     "stimulus_id": "string",
     "response_text": "string",
     "response_time_ms": "number",
+    "response_latency_ms": "number",
     "typing_wpm": "number",
-    "error_rate": "number (0-100, percent of keystrokes that were backspaces)",
+    "error_rate": "number (0-100)",
+    "source": "app|sms",
     "timestamp": "ISO8601"
   },
   "burnout_result": {
-    "user_id": "string",
-    "stimulus_id": "string",
-    "score": "number (0-100, higher = more burnout)",
+    "score": "0-100",
     "level": "green|yellow|red",
-    "tribe_deviation": "number (0-1)",
-    "behavioral_deviation": "number (0-1)",
+    "tribe_deviation": "number",
+    "behavioral_deviation": "number",
     "top_indicators": ["string"],
     "intervention": "string",
     "brain_regions_flagged": ["string"],
-    "confidence": "number (0-1)",
-    "source": "tribe|fallback (tribe = scored by ML service, fallback = backend heuristic when ML offline)",
+    "confidence": "0-1",
+    "breakdown": {
+      "imessage": "number (text/SMS sentiment burnout contribution 0-100)",
+      "typing": "number (typing biometrics 0-100)",
+      "facial": "number (video facial stress 0-100, 0 if no video)",
+      "voice": "number (video voice stress 0-100, 0 if no video)",
+      "tribe": "number (TRIBE deviation contribution 0-100)"
+    },
     "timestamp": "ISO8601"
   },
   "endpoints": {
     "backend (8001, owner: jason)": {
-      "POST /stimulus/send": "{ user_id, stimulus_id } -> { user_id, stimulus }",
-      "POST /response/submit": "{ user_id, stimulus_id, response_text, response_time_ms, typing_wpm, error_rate } -> burnout_result",
+      "GET /health": "-> service status",
+      "GET /stimulus/today/{user_id}": "-> stimulus (daily rotation)",
+      "GET /stimulus/all": "-> [stimulus, ...]",
+      "POST /response/submit": "user_response -> burnout_result (orchestrates signals -> ML -> store)",
       "GET /score/{user_id}": "-> latest burnout_result",
-      "GET /brain/{user_id}": "-> { brain_regions, brain_regions_flagged, level, score, ... }",
-      "GET /history/{user_id}": "-> { history: [burnout_result, ...] }",
-      "GET /stimuli": "-> { stimuli: [stimulus, ...] }",
-      "GET /health": "-> service status"
+      "GET /history/{user_id}": "-> [burnout_result, ...] (most recent first, up to 30)",
+      "GET /metrics/{user_id}": "-> { score_trend, latest_breakdown, total_checkins }",
+      "GET /brain/{user_id}": "-> { regions, ... } TRIBE brain data for the latest stimulus",
+      "POST /video/submit": "multipart (video, user_id) -> video analysis result"
     },
     "signals (8002, owner: dhruva)": {
       "POST /analyze": "{ user_id, response_text, response_time_ms, typing_wpm, error_rate } -> { sentiment_score, energy_level, linguistic_flags, combined_signal_score, detail }",
       "GET /signals/{user_id}": "-> latest analyzed signals",
-      "POST /alert": "{ user_id, phone, score, level, intervention } -> { sent, message_sid }"
+      "POST /alert": "{ user_id, phone, score, level, intervention } -> { sent, message_sid }  (NOTE: live endpoint is /alert and REQUIRES phone)"
     },
     "ml (8003, owner: rishith)": {
-      "POST /predict": "{ stimulus_path, modality } -> { brain_activation, regions }",
-      "POST /score": "{ user_id, stimulus_id, signals } -> burnout_result"
+      "POST /score": "{ user_id, stimulus_id, signals } -> burnout_result",
+      "GET /baseline/{stimulus_id}": "-> { regions, ... } TRIBE baseline brain activation"
+    },
+    "video (8004, owner: rishith)": {
+      "POST /analyze/video": "multipart video -> { facial: {...}, voice: {...} }"
     }
   },
-  "notes": "stimulus shape mirrors signals/stimuli/bank.py (the live source of truth for stimuli). shared/stimuli.json is the canonical manifest the backend serves."
+  "notes": "Backend keeps a graceful-fallback layer: if signals (8002) or ML (8003) are offline, /response/submit returns a degraded burnout_result (source='fallback') instead of erroring, so the app + SMS bot keep working during the demo."
 }

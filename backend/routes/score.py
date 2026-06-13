@@ -1,16 +1,24 @@
-"""GET /score/{user_id} — latest burnout_result for a user."""
-from fastapi import APIRouter, Depends, HTTPException
+"""GET /score/{user_id} — latest burnout_result (prefix /score)."""
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 import crud
 from models.database import get_db
 
-router = APIRouter(tags=["score"])
+router = APIRouter()
 
 
-@router.get("/score/{user_id}")
-def get_score(user_id: str, db: Session = Depends(get_db)):
+@router.get("/{user_id}")
+def get_latest_score(user_id: str, db: Session = Depends(get_db)):
     rec = crud.latest_score(db, user_id)
     if rec is None:
-        raise HTTPException(status_code=404, detail=f"No score yet for user '{user_id}'")
+        return {
+            "user_id": user_id,
+            "score": 0,
+            "level": "green",
+            "intervention": "Take your first pulse check!",
+            "breakdown": {},
+            "top_indicators": [],
+            "source": "none",
+        }
     return rec.to_result()

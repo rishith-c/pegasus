@@ -1,6 +1,7 @@
-"""POST /response/submit — the orchestrator endpoint.
+"""POST /response/submit — the orchestrator (prefix /response).
 
 Flow: signals (8002) -> ML score (8003) -> persist -> red-alert (best effort).
+Called by Wesley's app (source="app") and Dhruva's SMS bot (source="sms").
 Each downstream call degrades gracefully so the backend works standalone.
 """
 import logging
@@ -11,28 +12,35 @@ from sqlalchemy.orm import Session
 import crud
 from models.database import get_db
 from schemas import ResponseSubmitRequest
-from services import scoring, signal_client, stimuli, tribe_client
+from services import ml_client, scoring, signal_client, stimuli
 
-router = APIRouter(tags=["response"])
+router = APIRouter()
 log = logging.getLogger("pegasus.backend")
 
 
-@router.post("/response/submit")
-async def submit_response(req: ResponseSubmitRequest, db: Session = Depends(get_db)):
-    crud.ensure_user(db, req.user_id)
-    stimulus = stimuli.get_stimulus(req.stimulus_id)
+@router.post("/submit")
+async def submit_response(data: ResponseSubmitRequest, db: Session = Depends(get_db)):
+    crud.ensure_user(db, data.user_id)
+    stimulus = stimuli.get_stimulus(data.stimulus_id)
     raw = {
-        "response_text": req.response_text,
-        "response_time_ms": req.response_time_ms,
-        "typing_wpm": req.typing_wpm,
-        "error_rate": req.error_rate,
+        "response_text": data.response_text,
+        "response_time_ms": data.response_time_ms,
+        "response_latency_ms": data.response_latency_ms,
+        "typing_wpm": data.typing_wpm,
+        "error_rate": data.error_rate,
     }
 
     # 1) Signal analysis (Dhruva, 8002). Fall back to a local heuristic if offline.
     signals_ok = True
     try:
         analysis = await signal_client.analyze(
-            req.user_id, req.response_text, req.response_time_ms, req.typing_wpm, req.error_rate
+            {
+                "user_id": data.user_id,
+                "response_text": data.response_text,
+                "response_time_ms": data.response_time_ms,
+                "typing_wpm": data.typing_wpm,
+                "error_rate": data.error_rate,
+            }
         )
     except Exception as exc:  # noqa: BLE001 - degrade gracefully
         log.warning("signals service unavailable, using local analysis: %s", exc)
@@ -41,30 +49,33 @@ async def submit_response(req: ResponseSubmitRequest, db: Session = Depends(get_
 
     # 2) Burnout scoring (Rishith, 8003). Fall back to local scoring if offline.
     ml_signals = {
-        **raw,
         "sentiment_score": analysis.get("sentiment_score"),
         "energy_level": analysis.get("energy_level"),
         "linguistic_flags": analysis.get("linguistic_flags"),
         "combined_signal_score": analysis.get("combined_signal_score"),
+        "typing_wpm": data.typing_wpm,
+        "error_rate": data.error_rate,
+        "response_time_ms": data.response_time_ms,
+        "response_latency_ms": data.response_latency_ms,
     }
     try:
-        ml_result = await tribe_client.score(req.user_id, req.stimulus_id, ml_signals)
-        result = scoring.normalize_ml_result(ml_result, stimulus)
+        ml_result = await ml_client.score(data.user_id, data.stimulus_id, ml_signals)
+        result = scoring.normalize_ml_result(ml_result, stimulus, analysis, raw)
     except Exception as exc:  # noqa: BLE001 - degrade gracefully
         log.warning("ML service unavailable, using fallback scoring: %s", exc)
         result = scoring.fallback_score(stimulus, analysis, raw)
 
     # 3) Persist.
-    rec = crud.save_score(db, req.user_id, req.stimulus_id, result, raw)
+    rec = crud.save_score(db, data.user_id, data.stimulus_id, result, data.source)
 
     # 4) Red alert via signals service (best effort, never fails the request).
     alert = None
     if result["level"] == "red":
-        user = crud.get_user(db, req.user_id)
+        user = crud.get_user(db, data.user_id)
         if user and user.phone:
             try:
                 alert = await signal_client.send_alert(
-                    req.user_id, user.phone, result["score"], result["level"], result["intervention"]
+                    data.user_id, user.phone, result["score"], result["level"], result["intervention"]
                 )
             except Exception as exc:  # noqa: BLE001
                 log.warning("alert dispatch failed: %s", exc)

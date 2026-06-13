@@ -23,6 +23,6 @@ def get_db():
 
 def init_db():
     """Create tables. Import models first so they register on Base.metadata."""
-    from models import user, session, score_record  # noqa: F401
+    from models import score_record, session, user, video_record  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
