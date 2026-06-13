@@ -1,0 +1,239 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.app-header h1 {
+  font-size: 42px;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.app-subtitle {
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.app-section {
+  background: #1e293b;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.app-section h2 {
+  margin-top: 0;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #94a3b8;
+}
+
+.app-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-indicators {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.indicator-pill {
+  background: #334155;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.app-intervention {
+  text-align: center;
+  font-size: 16px;
+  max-width: 500px;
+  color: #cbd5e1;
+}
+
+/* Stimulus player */
+.stimulus-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.stimulus-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stimulus-calm {
+  background: #134e4a;
+  color: #5eead4;
+}
+
+.stimulus-neutral {
+  background: #334155;
+  color: #cbd5e1;
+}
+
+.stimulus-activating {
+  background: #7f1d1d;
+  color: #fca5a5;
+}
+
+.stimulus-media {
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.stimulus-text {
+  font-size: 20px;
+  line-height: 1.5;
+  text-align: center;
+  font-style: italic;
+}
+
+.stimulus-empty,
+.brain-empty,
+.history-empty {
+  color: #64748b;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Response capture */
+.response-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.response-textarea {
+  width: 100%;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+  color: #e2e8f0;
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.response-textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.response-submit {
+  align-self: flex-end;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.response-submit:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.response-submit:disabled {
+  background: #334155;
+  cursor: not-allowed;
+}
+
+/* Brain heatmap */
+.brain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.brain-cell-fill {
+  border-radius: 8px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s;
+}
+
+.brain-cell-value {
+  font-weight: 700;
+  color: #fff;
+  font-size: 18px;
+}
+
+.brain-cell-label {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* History graph */
+.history-svg {
+  width: 100%;
+  height: auto;
+}
+
+/* Alert banner content */
+.alert-banner-content {
+  text-align: center;
+  color: #fff;
+  max-width: 500px;
+  padding: 32px;
+}
+
+.alert-banner-icon {
+  font-size: 64px;
+}
+
+.alert-banner-close {
+  margin-top: 24px;
+  background: #fff;
+  color: #7f1d1d;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
