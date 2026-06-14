@@ -1,5 +1,5 @@
 // Pegasus app root. Owned by Wesley (visual layer).
-// Wires the dark navigation theme, gesture handler, and safe-area providers
+// Wires the light navigation theme, gesture handler, and safe-area providers
 // around the bottom tab navigator. Screens live under src/screens.
 import "react-native-gesture-handler";
 import React from "react";
@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   NavigationContainer,
-  DarkTheme,
+  DefaultTheme,
   Theme,
 } from "@react-navigation/native";
 
@@ -16,11 +16,11 @@ import TabNavigator from "./src/navigation/TabNavigator";
 import { COLORS } from "./src/utils/colors";
 
 const navTheme: Theme = {
-  ...DarkTheme,
-  dark: true,
+  ...DefaultTheme,
+  dark: false,
   colors: {
-    ...DarkTheme.colors,
-    primary: COLORS.green,
+    ...DefaultTheme.colors,
+    primary: COLORS.blue,
     background: COLORS.bg,
     card: COLORS.card,
     text: COLORS.text,
@@ -36,7 +36,7 @@ export default function App() {
         <NavigationContainer theme={navTheme}>
           <TabNavigator />
         </NavigationContainer>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

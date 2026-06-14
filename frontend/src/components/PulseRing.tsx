@@ -12,6 +12,7 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 
 export interface PulseRingProps {
@@ -27,7 +28,7 @@ export interface PulseRingProps {
 const RING_COUNT = 3;
 
 interface RingProps {
-  progress: Animated.SharedValue<number>;
+  progress: SharedValue<number>;
   color: string;
   size: number;
   // Phase offset in [0,1) so rings don't all pulse in unison.

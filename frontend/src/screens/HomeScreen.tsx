@@ -1,7 +1,8 @@
 // HomeScreen — the hero. "A check engine light for your mind."
-// Live burnout score via useBurnoutScore, the breathing CheckEngine orb,
-// the top indicators, an intervention suggestion, and the primary check-in CTA.
-// On a red reading we fire a heavy haptic and surface a calm full-screen alert.
+// Live wellness score (0..100, higher = better) via useBurnoutScore, the
+// breathing CheckEngine orb, the top indicators, an intervention suggestion, and
+// the primary check-in CTA. On a low (red) reading we fire a heavy haptic and
+// surface a calm full-screen alert.
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,6 +27,8 @@ import Animated, {
 import CheckEngine from "../components/CheckEngine";
 import IndicatorCard, { type IndicatorTone } from "../components/IndicatorCard";
 import InterventionCard from "../components/InterventionCard";
+import SmsCheckinCard from "../components/SmsCheckinCard";
+import ScrollEdgeFade from "../components/ScrollEdgeFade";
 import { useBurnoutScore } from "../hooks/useBurnoutScore";
 import { DEFAULT_USER_ID } from "../services/config";
 import { COLORS, RADIUS, SPACING, TYPE, levelColor } from "../utils/colors";
@@ -33,14 +36,12 @@ import type { BurnoutLevel } from "../utils/colors";
 import { scoreLabel } from "../utils/formatting";
 
 // The tab navigator route names — mirror of TabNavigator's TabParamList so
-// navigation.navigate("Check-In") is type-checked here.
+// navigation.navigate("Talk") is type-checked here.
 type TabParamList = {
   Home: undefined;
-  Pulse: undefined;
-  "Check-In": undefined;
+  Talk: undefined;
   Metrics: undefined;
   Brain: undefined;
-  History: undefined;
 };
 
 type Props = BottomTabScreenProps<TabParamList, "Home">;
@@ -96,10 +97,13 @@ export default function HomeScreen({ navigation }: Props) {
   const intervention = score?.intervention ?? "";
   // `support` is the longer, reassuring copy shown on a red alert. The backend
   // may not always send it, so fall back to the intervention text.
+  // The backend may send `support` as a string, an empty array, or omit it —
+  // coerce defensively so a non-string never reaches .trim() (that crashed Home).
+  const rawSupport = (score as unknown as { support?: unknown } | null)?.support;
   const support =
-    ((score as unknown as { support?: string } | null)?.support ?? "").trim() ||
+    (typeof rawSupport === "string" ? rawSupport : "").trim() ||
     intervention ||
-    "Your signals are running hot. Take a few slow breaths, step away from the screen, and reach out to someone you trust.";
+    "Your reserves are running low. Take a few slow breaths, step away from the screen, and reach out to someone you trust.";
 
   return (
     <View style={styles.root}>
@@ -159,10 +163,18 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.ctaWrap}>
           <CheckInButton
             accent={accent}
-            onPress={() => navigation.navigate("Check-In")}
+            onPress={() => navigation.navigate("Talk")}
           />
         </View>
+
+        {/* Text-me-a-check-in (SMS / iMessage via Bloo.io) */}
+        <View style={styles.section}>
+          <SmsCheckinCard />
+        </View>
       </ScrollView>
+
+      {/* Frosted top/bottom bands — content blurs softly as it scrolls under. */}
+      <ScrollEdgeFade topInset={insets.top} />
 
       {/* Red-level alert overlay */}
       <AlertOverlay
@@ -171,7 +183,7 @@ export default function HomeScreen({ navigation }: Props) {
         onDismiss={() => setAlertVisible(false)}
         onCheckIn={() => {
           setAlertVisible(false);
-          navigation.navigate("Check-In");
+          navigation.navigate("Talk");
         }}
       />
     </View>
@@ -203,9 +215,9 @@ function CheckInButton({
         onPress={onPress}
         style={[styles.cta, { borderColor: accent }]}
         accessibilityRole="button"
-        accessibilityLabel="Do a 30-second check-in"
+        accessibilityLabel="Talk to Pegasus"
       >
-        <Text style={styles.ctaText}>Do a 30-second check-in</Text>
+        <Text style={styles.ctaText}>Talk to Pegasus</Text>
       </Pressable>
     </Animated.View>
   );
@@ -234,8 +246,8 @@ function AlertOverlay({
       <Pressable style={styles.overlayScrim} onPress={onDismiss}>
         <Pressable style={styles.overlayCard} onPress={() => {}}>
           <View style={[styles.overlayDot, { backgroundColor: COLORS.red }]} />
-          <Text style={styles.overlayLabel}>ALERT: TAKE ACTION</Text>
-          <Text style={styles.overlayTitle}>Your signals are running hot</Text>
+          <Text style={styles.overlayLabel}>RUNNING LOW</Text>
+          <Text style={styles.overlayTitle}>Your reserves are running low</Text>
           <Text style={styles.overlaySupport}>{support}</Text>
 
           <Pressable
@@ -243,7 +255,7 @@ function AlertOverlay({
             style={[styles.overlayPrimary, { borderColor: COLORS.red }]}
             accessibilityRole="button"
           >
-            <Text style={styles.overlayPrimaryText}>Do a 30-second check-in</Text>
+            <Text style={styles.overlayPrimaryText}>Talk to Pegasus</Text>
           </Pressable>
 
           <Pressable onPress={onDismiss} style={styles.overlaySecondary}>
@@ -295,9 +307,10 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   statusLabel: {
-    ...TYPE.heading,
-    marginTop: SPACING.sm,
-    letterSpacing: 0.2,
+    fontSize: 24,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+    marginTop: SPACING.xs,
   },
   section: {
     marginTop: SPACING.xl,
@@ -316,8 +329,8 @@ const styles = StyleSheet.create({
   },
   ctaShadow: {
     borderRadius: RADIUS.lg,
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
   },
@@ -338,7 +351,7 @@ const styles = StyleSheet.create({
   // Alert overlay
   overlayScrim: {
     flex: 1,
-    backgroundColor: "rgba(5, 5, 8, 0.82)",
+    backgroundColor: "rgba(29, 29, 31, 0.32)",
     alignItems: "center",
     justifyContent: "center",
     padding: SPACING.lg,
@@ -348,13 +361,13 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.35)",
+    borderColor: "rgba(255, 59, 48, 0.30)",
     borderRadius: RADIUS.lg,
     padding: SPACING.xl,
-    shadowColor: COLORS.red,
-    shadowOpacity: 0.3,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
     shadowRadius: 28,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 12 },
     elevation: 12,
   },
   overlayDot: {
@@ -380,7 +393,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   overlayPrimary: {
-    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    backgroundColor: COLORS.red,
     borderWidth: 1,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.md,
@@ -390,7 +403,7 @@ const styles = StyleSheet.create({
   overlayPrimaryText: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.text,
+    color: "#ffffff",
   },
   overlaySecondary: {
     alignItems: "center",

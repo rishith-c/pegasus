@@ -39,7 +39,7 @@ export default function InterventionCard({ text }: Props) {
   return (
     <Animated.View style={animatedStyle}>
       <LinearGradient
-        colors={["#16131f", "#12121a"]}
+        colors={["#fff8ec", "#ffffff"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.card}
@@ -72,14 +72,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: "rgba(234, 179, 8, 0.22)",
+    borderColor: "rgba(255, 159, 10, 0.30)",
     overflow: "hidden",
     // Soft warm glow to make the card feel highlighted and inviting.
     shadowColor: WARM,
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    elevation: 3,
   },
   rail: {
     width: 3,

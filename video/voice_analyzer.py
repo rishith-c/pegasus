@@ -3,13 +3,13 @@
 # transcript / zeros) so a check-in never hard-fails.
 import os
 
-import librosa
 import numpy as np
 
 NVIDIA_STT_KEY = os.getenv("NVIDIA_STT_KEY")
 RIVA_SERVER = os.getenv("NVIDIA_RIVA_SERVER", "grpc.nvcf.nvidia.com:443")
-# Parakeet CTC 1.1B ASR (en-US) hosted function.
-ASR_FUNCTION_ID = os.getenv("NVIDIA_ASR_FUNCTION_ID", "1598d209-5e27-4d3c-8079-4751568b1081")
+# parakeet-tdt-0.6b-v2 — supports OFFLINE recognize (the 1.1b CTC function is
+# streaming-only and rejects offline_recognize).
+ASR_FUNCTION_ID = os.getenv("NVIDIA_ASR_FUNCTION_ID", "d3fe9151-442b-4204-a70d-5fcc597fd610")
 
 
 class VoiceStressAnalyzer:
@@ -28,12 +28,16 @@ class VoiceStressAnalyzer:
                 ],
             )
             asr = riva.client.ASRService(auth)
+            # The /converse + /analyze paths feed a 16 kHz mono WAV. Set the
+            # config explicitly (add_audio_file_specs picked params the model
+            # wouldn't serve).
             config = riva.client.RecognitionConfig(
+                encoding=riva.client.AudioEncoding.LINEAR_PCM,
+                sample_rate_hertz=16000,
                 language_code="en-US",
                 max_alternatives=1,
                 enable_automatic_punctuation=True,
             )
-            riva.client.add_audio_file_specs_to_config(config, audio_path)
             with open(audio_path, "rb") as f:
                 data = f.read()
             resp = asr.offline_recognize(data, config)
@@ -46,6 +50,8 @@ class VoiceStressAnalyzer:
     def analyze_audio(self, audio_path: str) -> dict:
         transcript = self.transcribe_nvidia(audio_path)
         try:
+            import librosa  # lazy — voice stress is optional; transcript already done
+
             y, sr = librosa.load(audio_path)
             pitches, mags = librosa.piptrack(y=y, sr=sr)
             vals = [

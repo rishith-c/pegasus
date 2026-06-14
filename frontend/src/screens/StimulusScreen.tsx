@@ -288,7 +288,7 @@ export default function StimulusScreen() {
             disabled={submitting || text.trim().length === 0}
           >
             {submitting ? (
-              <ActivityIndicator color={COLORS.bg} />
+              <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.primaryBtnText}>Submit pulse</Text>
             )}
@@ -402,6 +402,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: SPACING.md,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
   input: {
     ...TYPE.body,
@@ -421,7 +426,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     ...TYPE.heading,
-    color: COLORS.bg,
+    color: "#ffffff",
     fontSize: 17,
   },
   btnDisabled: {

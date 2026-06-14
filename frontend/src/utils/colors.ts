@@ -1,17 +1,22 @@
 // Design tokens for Pegasus. Owned by Wesley (visual layer).
-// "Tesla dashboard for your mind" — dark, premium, calm, futuristic.
+// Apple-HIG light theme — clean, airy, high-contrast. Matches the pitch deck
+// (apple.com / keynote aesthetic): off-white canvas, white elevated cards with
+// hairline borders and soft shadows, Apple-blue accents, SF system type.
 
 export const COLORS = {
-  bg: "#0a0a0a",
-  card: "#12121a",
-  border: "#23232e",
-  text: "#ffffff",
-  textDim: "#9aa0aa",
-  green: "#22c55e",
-  yellow: "#eab308",
-  red: "#ef4444",
-  blue: "#3b82f6",
+  bg: "#f5f5f7", // Apple off-white canvas
+  card: "#ffffff", // elevated surfaces (hairline border + soft shadow)
+  border: "#d2d2d7", // hairline separators / borders
+  text: "#1d1d1f", // primary text
+  textDim: "#6e6e73", // secondary / dim text
+  green: "#34C759", // engine-light: calm
+  yellow: "#FF9F0A", // engine-light: elevated (Apple amber)
+  red: "#FF3B30", // engine-light: alert
+  blue: "#0071e3", // accent: primary / links / active (Apple blue)
 } as const;
+
+// Tertiary text — quieter than textDim, for the lightest captions/footnotes.
+export const TEXT_TERTIARY = "#86868b";
 
 export type BurnoutLevel = "green" | "yellow" | "red";
 
@@ -39,7 +44,7 @@ export const SPACING = {
   xxl: 48,
 } as const;
 
-// Corner radii — cards sit in the 16-20 range per design spec.
+// Corner radii — Apple-ish soft rounding. Cards sit in the 16-20 range.
 export const RADIUS = {
   sm: 10,
   md: 16,
@@ -47,13 +52,14 @@ export const RADIUS = {
   pill: 999,
 } as const;
 
-// Typographic scale. Big numerals for scores, calm body copy.
+// Typographic scale. Big, tight SF headlines; calm body copy. The app uses the
+// platform system font (-apple-system / SF) via React Native defaults.
 export const TYPE = {
-  hero: { fontSize: 64, fontWeight: "800" as const, letterSpacing: -1 },
-  score: { fontSize: 48, fontWeight: "800" as const, letterSpacing: -0.5 },
-  title: { fontSize: 28, fontWeight: "700" as const, letterSpacing: -0.3 },
-  heading: { fontSize: 20, fontWeight: "700" as const },
-  body: { fontSize: 16, fontWeight: "500" as const },
+  hero: { fontSize: 64, fontWeight: "700" as const, letterSpacing: -1.5 },
+  score: { fontSize: 48, fontWeight: "700" as const, letterSpacing: -1 },
+  title: { fontSize: 28, fontWeight: "700" as const, letterSpacing: -0.4 },
+  heading: { fontSize: 20, fontWeight: "600" as const, letterSpacing: -0.2 },
+  body: { fontSize: 16, fontWeight: "400" as const },
   label: { fontSize: 13, fontWeight: "600" as const, letterSpacing: 0.4 },
-  caption: { fontSize: 12, fontWeight: "500" as const },
+  caption: { fontSize: 12, fontWeight: "400" as const },
 } as const;

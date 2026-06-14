@@ -21,13 +21,22 @@ import {
   View,
 } from "react-native";
 import Svg, { Path, Circle } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import TrendChart from "../components/TrendChart";
 import ScoreBreakdown from "../components/ScoreBreakdown";
+import ScrollEdgeFade from "../components/ScrollEdgeFade";
 import { BurnoutResult } from "../types";
 import { getMetrics, getHistory } from "../services/api";
 import { DEFAULT_USER_ID } from "../services/config";
-import { COLORS, RADIUS, SPACING, TYPE, levelColor } from "../utils/colors";
+import {
+  COLORS,
+  RADIUS,
+  SPACING,
+  TYPE,
+  TEXT_TERTIARY,
+  levelColor,
+} from "../utils/colors";
 import { relativeTime, scoreLabel } from "../utils/formatting";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -96,6 +105,7 @@ function weekOverWeek(
 }
 
 export default function MetricsScreen() {
+  const insets = useSafeAreaInsets();
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
   const [history, setHistory] = useState<RichHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +119,7 @@ export default function MetricsScreen() {
     try {
       const [m, h] = await Promise.all([
         getMetrics(DEFAULT_USER_ID) as Promise<MetricsPayload>,
-        getHistory(DEFAULT_USER_ID) as Promise<RichHistory[]>,
+        getHistory(DEFAULT_USER_ID) as unknown as Promise<RichHistory[]>,
       ]);
       setMetrics(m ?? {});
       setHistory(Array.isArray(h) ? h : []);
@@ -238,21 +248,28 @@ export default function MetricsScreen() {
   const accent = levelColor(currentLevel);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => load("refresh")}
-          tintColor={COLORS.textDim}
-        />
-      }
-    >
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + SPACING.md,
+            paddingBottom: SPACING.xxl,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => load("refresh")}
+            tintColor={COLORS.textDim}
+          />
+        }
+      >
       {/* Current score header */}
       <View style={styles.header}>
-        <Text style={styles.kicker}>BURNOUT INDEX</Text>
+        <Text style={styles.kicker}>WELLNESS SCORE</Text>
         {currentScore != null ? (
           <>
             <View style={styles.scoreRow}>
@@ -338,8 +355,12 @@ export default function MetricsScreen() {
         </>
       )}
 
-      <View style={styles.footerSpace} />
-    </ScrollView>
+        <View style={styles.footerSpace} />
+      </ScrollView>
+
+      {/* Frosted top/bottom bands — content blurs softly as it scrolls under. */}
+      <ScrollEdgeFade topInset={insets.top} />
+    </View>
   );
 }
 
@@ -581,7 +602,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xxl,
   },
   loadingText: {
     ...TYPE.body,
@@ -613,6 +633,7 @@ const styles = StyleSheet.create({
     ...TYPE.label,
     color: COLORS.textDim,
     textTransform: "uppercase",
+    letterSpacing: 1.5,
     marginBottom: SPACING.sm,
   },
   scoreRow: {
@@ -621,13 +642,16 @@ const styles = StyleSheet.create({
   },
   score: {
     ...TYPE.hero,
+    fontWeight: "800",
     color: COLORS.text,
     lineHeight: 64,
   },
   scoreOutOf: {
-    ...TYPE.heading,
-    color: COLORS.textDim,
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: "600",
+    color: TEXT_TERTIARY,
+    letterSpacing: -0.2,
+    marginBottom: 11,
     marginLeft: 4,
   },
   statusRow: {
@@ -659,6 +683,7 @@ const styles = StyleSheet.create({
     ...TYPE.label,
     color: COLORS.textDim,
     textTransform: "uppercase",
+    letterSpacing: 1.5,
     marginBottom: SPACING.md,
   },
 
@@ -669,6 +694,11 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   emptyTitle: {
     ...TYPE.heading,
@@ -693,6 +723,11 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
   wowLabel: {
     ...TYPE.caption,
@@ -745,6 +780,11 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   sentimentHeader: {
     flexDirection: "row",

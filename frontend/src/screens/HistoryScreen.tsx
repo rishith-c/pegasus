@@ -1,9 +1,10 @@
-// HistoryScreen — your timeline of past readings. "Tesla dashboard for your mind."
-// Newest-first list from getHistory(DEFAULT_USER_ID). Each row shows a relative
-// timestamp, a small level-colored score circle, and the top indicator. Tapping a
-// row expands the full signal breakdown + intervention. Filter chips (All / green /
-// yellow / red), pull-to-refresh, and graceful loading / empty / error states.
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+// HistoryScreen — your timeline of past check-ins and talks. A calm, most-recent-
+// first list pulled from getHistory(DEFAULT_USER_ID). Each card shows what kind of
+// moment it was (Talk / Check-in), when it happened, a wellness score chip
+// (higher is better, colored by level), the user's own words, and the gentle
+// intervention Pegasus offered. White cards on the Apple off-white canvas with
+// hairline borders, soft shadows, and frosted top/bottom scroll bands.
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -14,86 +15,81 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 
-import ScoreBreakdown from "../components/ScoreBreakdown";
-import InterventionCard from "../components/InterventionCard";
 import { getHistory } from "../services/api";
 import { DEFAULT_USER_ID } from "../services/config";
-import type { BurnoutResult } from "../types";
+import { HistoryEntry } from "../types";
 import { COLORS, RADIUS, SPACING, TYPE, levelColor } from "../utils/colors";
-import type { BurnoutLevel } from "../utils/colors";
-import { relativeTime, scoreLabel, titleCase } from "../utils/formatting";
+import ScrollEdgeFade from "../components/ScrollEdgeFade";
 
-type Filter = "all" | "green" | "yellow" | "red";
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "green", label: "Calm" },
-  { key: "yellow", label: "Watch" },
-  { key: "red", label: "Alert" },
-];
-
-// A stable key for a reading. Timestamps should be unique per reading; the
-// index guards against any duplicates the backend might return.
-function readingKey(r: BurnoutResult, i: number): string {
-  return `${r.timestamp ?? "t"}-${i}`;
+// Short, Apple-style timestamp: the time of day for moments from today
+// (e.g. "2:45 PM"), the month + day for anything older (e.g. "Jun 14").
+function shortWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
 
-  const [history, setHistory] = useState<BurnoutResult[] | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  const load = useCallback(async (mode: "initial" | "refresh") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+  const load = useCallback(() => {
+    setLoading(true);
     setError(null);
-    try {
-      const data = await getHistory(DEFAULT_USER_ID);
-      // Newest-first. Sort defensively in case the API returns oldest-first.
-      const sorted = [...(data ?? [])].sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-      setHistory(sorted);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load your history");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    getHistory(DEFAULT_USER_ID)
+      .then((d) => setHistory(d ?? []))
+      .catch((e) => setError(e?.message ?? "Couldn't load your history."))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    load("initial");
+    load();
   }, [load]);
 
-  const filtered = useMemo(() => {
-    if (!history) return [];
-    if (filter === "all") return history;
-    return history.filter((r) => r.level === filter);
-  }, [history, filter]);
-
-  // First load, before any data has arrived.
+  // First load: calm, minimal spinner.
   if (loading && !history) {
     return (
       <View style={[styles.root, styles.centerRoot]}>
         <ActivityIndicator color={COLORS.textDim} />
-        <Text style={styles.centerText}>Loading your timeline…</Text>
+        <Text style={styles.centerText}>Loading your history…</Text>
       </View>
     );
   }
+
+  // Error / unreachable: clear, non-alarming fallback with a retry.
+  if (error && !history) {
+    return (
+      <View style={[styles.root, styles.centerRoot]}>
+        <Text style={styles.errorTitle}>History unavailable</Text>
+        <Text style={styles.errorBody}>{error}</Text>
+        <Pressable
+          onPress={load}
+          style={styles.retryBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading history"
+        >
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const entries = history ?? [];
 
   return (
     <View style={styles.root}>
@@ -105,8 +101,8 @@ export default function HistoryScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => load("refresh")}
+            refreshing={loading}
+            onRefresh={load}
             tintColor={COLORS.textDim}
             colors={[COLORS.green]}
           />
@@ -115,217 +111,85 @@ export default function HistoryScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>History</Text>
-          <Text style={styles.subtitle}>your readings over time</Text>
+          <Text style={styles.subtitle}>Your past check-ins and talks</Text>
         </View>
 
-        {/* Filter chips */}
-        <View style={styles.chips}>
-          {FILTERS.map(({ key, label }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              filterKey={key}
-              active={filter === key}
-              onPress={() => setFilter(key)}
-            />
-          ))}
-        </View>
-
-        {/* Error state — keeps any previously loaded data visible below. */}
+        {/* Inline error — keeps any previously loaded list visible below. */}
         {error && (
-          <Pressable style={styles.errorCard} onPress={() => load("refresh")}>
-            <Text style={styles.errorText}>{error}</Text>
-            <Text style={styles.errorHint}>Tap to retry</Text>
+          <Pressable style={styles.errorCard} onPress={load}>
+            <Text style={styles.errorCardText}>{error}</Text>
+            <Text style={styles.errorCardHint}>Tap to retry</Text>
           </Pressable>
         )}
 
-        {/* Empty state */}
-        {!error && filtered.length === 0 ? (
-          <EmptyState filter={filter} hasAny={(history?.length ?? 0) > 0} />
+        {entries.length === 0 ? (
+          <EmptyState />
         ) : (
           <View style={styles.list}>
-            {filtered.map((reading, i) => {
-              const key = readingKey(reading, i);
-              return (
-                <HistoryRow
-                  key={key}
-                  reading={reading}
-                  expanded={expandedKey === key}
-                  onToggle={() =>
-                    setExpandedKey((cur) => (cur === key ? null : key))
-                  }
-                />
-              );
-            })}
+            {entries.map((entry, i) => (
+              <HistoryCard key={`${entry.timestamp}-${i}`} entry={entry} />
+            ))}
           </View>
         )}
       </ScrollView>
+
+      {/* Frosted top/bottom bands — content blurs softly as it scrolls under. */}
+      <ScrollEdgeFade topInset={insets.top} />
     </View>
   );
 }
 
-// A single filter chip. Active state tints to the level's accent (or white for All).
-function FilterChip({
-  label,
-  filterKey,
-  active,
-  onPress,
-}: {
-  label: string;
-  filterKey: Filter;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const accent = filterKey === "all" ? COLORS.text : levelColor(filterKey);
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      style={[
-        styles.chip,
-        active && { borderColor: accent, backgroundColor: "rgba(255,255,255,0.04)" },
-      ]}
-    >
-      {filterKey !== "all" && (
-        <View style={[styles.chipDot, { backgroundColor: accent }]} />
-      )}
-      <Text style={[styles.chipText, active && { color: accent }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-// A history row. Collapsed: timestamp + score circle + top indicator. Expanded:
-// status label, full signal breakdown, and the intervention copy.
-function HistoryRow({
-  reading,
-  expanded,
-  onToggle,
-}: {
-  reading: BurnoutResult;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const level = (reading.level as BurnoutLevel) ?? "green";
-  const accent = levelColor(level);
-  const when = relativeTime(reading.timestamp);
-  const topIndicator = (reading.top_indicators ?? []).filter(Boolean)[0];
-
-  const press = useSharedValue(0);
-  const pressStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 - press.value * 0.015 }],
-  }));
+// One past moment. Top row: a KIND badge + short timestamp on the left, the
+// wellness score chip on the right. Below: the user's words in quotes (if any),
+// then the intervention in a subtle inset row (if any).
+function HistoryCard({ entry }: { entry: HistoryEntry }) {
+  const accent = levelColor(entry.level);
+  const kindLabel = entry.kind === "talk" ? "Talk" : "Check-in";
+  const when = shortWhen(entry.timestamp);
+  const text = entry.text?.trim();
+  const intervention = entry.intervention?.trim();
 
   return (
-    <Animated.View style={pressStyle}>
-      <Pressable
-        onPress={onToggle}
-        onPressIn={() => {
-          press.value = withTiming(1, {
-            duration: 110,
-            easing: Easing.out(Easing.ease),
-          });
-        }}
-        onPressOut={() => {
-          press.value = withTiming(0, {
-            duration: 150,
-            easing: Easing.out(Easing.ease),
-          });
-        }}
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        accessibilityLabel={`Reading ${when || ""}, score ${Math.round(
-          reading.score
-        )}, ${scoreLabel(level)}`}
-        style={[styles.row, expanded && { borderColor: "rgba(255,255,255,0.12)" }]}
-      >
-        {/* Collapsed header */}
-        <View style={styles.rowHeader}>
-          <ScoreCircle score={reading.score} accent={accent} />
-          <View style={styles.rowBody}>
-            <Text style={styles.rowWhen}>{when || "—"}</Text>
-            <Text style={[styles.rowIndicator, { color: COLORS.textDim }]} numberOfLines={1}>
-              {topIndicator ?? scoreLabel(level)}
-            </Text>
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.metaRow}>
+          <View style={styles.kindBadge}>
+            <Text style={styles.kindText}>{kindLabel}</Text>
           </View>
-          <Text style={[styles.chevron, expanded && styles.chevronOpen]}>
-            {expanded ? "−" : "+"}
-          </Text>
+          {when ? <Text style={styles.when}>{when}</Text> : null}
         </View>
 
-        {/* Expanded detail */}
-        {expanded && (
-          <View style={styles.detail}>
-            <Text style={[styles.statusLabel, { color: accent }]}>
-              {scoreLabel(level)}
-            </Text>
+        {/* Wellness score — higher is better, colored by level. */}
+        <View style={[styles.scoreChip, { borderColor: accent }]}>
+          <Text style={[styles.scoreNum, { color: accent }]}>
+            {Math.round(entry.score ?? 0)}
+          </Text>
+          <Text style={styles.scoreOutOf}>/100</Text>
+        </View>
+      </View>
 
-            {/* Top indicators, beyond the one shown collapsed. */}
-            {(() => {
-              const indicators = (reading.top_indicators ?? []).filter(Boolean);
-              if (indicators.length === 0) return null;
-              return (
-                <View style={styles.indicatorList}>
-                  {indicators.map((text, i) => (
-                    <View key={`${i}-${text}`} style={styles.indicatorRow}>
-                      <View style={[styles.indicatorDot, { backgroundColor: accent }]} />
-                      <Text style={styles.indicatorText}>{titleCase(text)}</Text>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
+      {/* The user's own words. */}
+      {text ? <Text style={styles.quote}>“{text}”</Text> : null}
 
-            {/* Full signal breakdown. */}
-            {reading.breakdown && (
-              <View style={styles.breakdownWrap}>
-                <ScoreBreakdown breakdown={reading.breakdown} />
-              </View>
-            )}
-
-            {/* Intervention copy for this reading. */}
-            {reading.intervention?.trim() ? (
-              <View style={styles.interventionWrap}>
-                <InterventionCard text={reading.intervention} />
-              </View>
-            ) : null}
-          </View>
-        )}
-      </Pressable>
-    </Animated.View>
-  );
-}
-
-// Small level-colored score circle. Big-ish numeral, tinted ring + glow.
-function ScoreCircle({ score, accent }: { score: number; accent: string }) {
-  return (
-    <View style={[styles.circle, { borderColor: accent, shadowColor: accent }]}>
-      <Text style={[styles.circleScore, { color: accent }]}>
-        {Math.round(score ?? 0)}
-      </Text>
+      {/* Pegasus's gentle nudge for this moment. */}
+      {intervention ? (
+        <View style={styles.interventionRow}>
+          <View style={[styles.interventionBar, { backgroundColor: accent }]} />
+          <Text style={styles.interventionText}>{intervention}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-// Empty state — distinguishes "no readings at all" from "none match this filter".
-function EmptyState({
-  filter,
-  hasAny,
-}: {
-  filter: Filter;
-  hasAny: boolean;
-}) {
-  const filteredOut = filter !== "all" && hasAny;
+// Empty state — calm invitation to start a history.
+function EmptyState() {
   return (
     <View style={styles.empty}>
       <View style={styles.emptyDot} />
-      <Text style={styles.emptyTitle}>
-        {filteredOut ? "Nothing here yet" : "No readings yet"}
-      </Text>
+      <Text style={styles.emptyTitle}>No check-ins yet</Text>
       <Text style={styles.emptyText}>
-        {filteredOut
-          ? "No readings match this filter. Try another, or pull to refresh."
-          : "Your readings will appear here after your first check-in. Pull to refresh."}
+        Talk to Pegasus or reply to a text to start your history.
       </Text>
     </View>
   );
@@ -339,6 +203,7 @@ const styles = StyleSheet.create({
   centerRoot: {
     alignItems: "center",
     justifyContent: "center",
+    padding: SPACING.lg,
   },
   centerText: {
     ...TYPE.body,
@@ -348,6 +213,8 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: SPACING.lg,
   },
+
+  // Header
   header: {
     marginBottom: SPACING.lg,
   },
@@ -356,152 +223,155 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   subtitle: {
-    ...TYPE.caption,
+    ...TYPE.body,
     color: COLORS.textDim,
     marginTop: SPACING.xs,
-    letterSpacing: 0.4,
   },
-  // Filter chips
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+
+  // Full-screen error fallback
+  errorTitle: {
+    ...TYPE.heading,
+    color: COLORS.text,
   },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.pill,
+  errorBody: {
+    ...TYPE.body,
+    color: COLORS.textDim,
+    textAlign: "center",
+    marginTop: SPACING.sm,
+    lineHeight: 22,
+  },
+  retryBtn: {
+    marginTop: SPACING.xl,
     borderWidth: 1,
     borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
     backgroundColor: COLORS.card,
   },
-  chipDot: {
-    width: 7,
-    height: 7,
-    borderRadius: RADIUS.pill,
-    marginRight: SPACING.sm,
+  retryText: {
+    ...TYPE.body,
+    color: COLORS.text,
+    fontWeight: "700",
   },
-  chipText: {
-    ...TYPE.label,
-    color: COLORS.textDim,
-    letterSpacing: 0.3,
-  },
-  // Error
+
+  // Inline (non-blocking) error card
   errorCard: {
-    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    backgroundColor: "rgba(255, 59, 48, 0.08)",
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)",
+    borderColor: "rgba(255, 59, 48, 0.30)",
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.lg,
   },
-  errorText: {
+  errorCardText: {
     ...TYPE.body,
     color: COLORS.text,
   },
-  errorHint: {
+  errorCardHint: {
     ...TYPE.caption,
     color: COLORS.red,
     marginTop: SPACING.xs,
   },
+
   // List
   list: {
     gap: SPACING.md,
   },
-  row: {
+  card: {
     backgroundColor: COLORS.card,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: SPACING.sm,
+  },
+  kindBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  kindText: {
+    ...TYPE.label,
+    fontSize: 11,
+    color: COLORS.textDim,
+    letterSpacing: 0.5,
+  },
+  when: {
+    ...TYPE.caption,
+    color: COLORS.textDim,
+  },
+
+  // Wellness score chip
+  scoreChip: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    borderWidth: 1.5,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    marginLeft: SPACING.sm,
+  },
+  scoreNum: {
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
+  scoreOutOf: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.textDim,
+    marginLeft: 1,
+  },
+
+  // User's words
+  quote: {
+    ...TYPE.body,
+    fontStyle: "italic",
+    color: COLORS.textDim,
+    lineHeight: 23,
+    marginTop: SPACING.md,
+  },
+
+  // Intervention row
+  interventionRow: {
+    flexDirection: "row",
+    marginTop: SPACING.md,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderRadius: RADIUS.sm,
     padding: SPACING.md,
   },
-  rowHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  rowBody: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  rowWhen: {
-    ...TYPE.body,
-    color: COLORS.text,
-    fontWeight: "600",
-  },
-  rowIndicator: {
-    ...TYPE.caption,
-    marginTop: 2,
-  },
-  chevron: {
-    fontSize: 22,
-    fontWeight: "400",
-    color: COLORS.textDim,
-    marginLeft: SPACING.sm,
-    width: 18,
-    textAlign: "center",
-  },
-  chevronOpen: {
-    color: COLORS.text,
-  },
-  // Score circle
-  circle: {
-    width: 52,
-    height: 52,
+  interventionBar: {
+    width: 3,
     borderRadius: RADIUS.pill,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.02)",
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 3,
+    marginRight: SPACING.md,
   },
-  circleScore: {
-    fontSize: 20,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  // Expanded detail
-  detail: {
-    marginTop: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: SPACING.lg,
-  },
-  statusLabel: {
-    ...TYPE.heading,
-    marginBottom: SPACING.md,
-  },
-  indicatorList: {
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-  },
-  indicatorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  indicatorDot: {
-    width: 6,
-    height: 6,
-    borderRadius: RADIUS.pill,
-    marginRight: SPACING.sm,
-  },
-  indicatorText: {
+  interventionText: {
     flex: 1,
     ...TYPE.body,
+    fontSize: 15,
     color: COLORS.text,
+    lineHeight: 22,
   },
-  breakdownWrap: {
-    marginBottom: SPACING.lg,
-  },
-  interventionWrap: {
-    marginTop: SPACING.xs,
-  },
-  // Empty
+
+  // Empty state
   empty: {
     alignItems: "center",
     paddingVertical: SPACING.xxl,

@@ -9,16 +9,14 @@ import Svg, { Path, Circle } from "react-native-svg";
 import { COLORS } from "../utils/colors";
 
 import HomeScreen from "../screens/HomeScreen";
-import StimulusScreen from "../screens/StimulusScreen";
-import CheckInScreen from "../screens/CheckInScreen";
+import ChatScreen from "../screens/ChatScreen";
 import MetricsScreen from "../screens/MetricsScreen";
 import BrainScreen from "../screens/BrainScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 
 type TabParamList = {
   Home: undefined;
-  Pulse: undefined;
-  "Check-In": undefined;
+  Talk: undefined;
   Metrics: undefined;
   Brain: undefined;
   History: undefined;
@@ -50,33 +48,20 @@ function TabIcon({ name, color }: { name: keyof TabParamList; color: string }) {
           />
         </Svg>
       );
-    case "Pulse":
+    case "Talk":
       return (
         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
           <Path
-            d="M3 12h4l2.5-6 4 13L16 12h5"
-            stroke={stroke}
-            strokeWidth={sw}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
-      );
-    case "Check-In":
-      return (
-        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-          <Path
-            d="M4 7a2 2 0 012-2h7a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7z"
+            d="M4 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V6z"
             stroke={stroke}
             strokeWidth={sw}
             strokeLinejoin="round"
           />
           <Path
-            d="M15 10l5-3v10l-5-3"
+            d="M8.5 10h7M8.5 13h4"
             stroke={stroke}
             strokeWidth={sw}
             strokeLinecap="round"
-            strokeLinejoin="round"
           />
         </Svg>
       );
@@ -129,8 +114,7 @@ function TabIcon({ name, color }: { name: keyof TabParamList; color: string }) {
 // Per-tab accent used for the active glow. Brain glows blue per design spec.
 const TAB_ACCENT: Record<keyof TabParamList, string> = {
   Home: COLORS.green,
-  Pulse: COLORS.green,
-  "Check-In": COLORS.green,
+  Talk: COLORS.blue,
   Metrics: COLORS.green,
   Brain: COLORS.blue,
   History: COLORS.green,
@@ -138,8 +122,7 @@ const TAB_ACCENT: Record<keyof TabParamList, string> = {
 
 const LABELS: Record<keyof TabParamList, string> = {
   Home: "Home",
-  Pulse: "Pulse",
-  "Check-In": "Check-In",
+  Talk: "Talk",
   Metrics: "Metrics",
   Brain: "Brain",
   History: "History",
@@ -176,8 +159,8 @@ export default function TabNavigator() {
                 styles.iconWrap,
                 focused && {
                   shadowColor: accent,
-                  shadowOpacity: 0.9,
-                  shadowRadius: 12,
+                  shadowOpacity: 0.45,
+                  shadowRadius: 8,
                   shadowOffset: { width: 0, height: 0 },
                 },
               ]}
@@ -192,8 +175,7 @@ export default function TabNavigator() {
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Pulse" component={StimulusScreen} />
-      <Tab.Screen name="Check-In" component={CheckInScreen} />
+      <Tab.Screen name="Talk" component={ChatScreen} />
       <Tab.Screen name="Metrics" component={MetricsScreen} />
       <Tab.Screen name="Brain" component={BrainScreen} />
       <Tab.Screen name="History" component={HistoryScreen} />
@@ -209,7 +191,13 @@ const styles = StyleSheet.create({
     height: Platform.OS === "ios" ? 88 : 68,
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 28 : 10,
-    elevation: 0,
+    // Soft upward elevation so the bar reads as a floating surface on the
+    // light canvas (Apple-style).
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 8,
   },
   tabItem: {
     paddingTop: 2,

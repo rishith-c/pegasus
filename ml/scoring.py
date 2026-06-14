@@ -17,6 +17,33 @@ CHAT_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 
 _POSITIVE_EMOTIONS = {"joy", "neutral", "surprise"}
 
+# Direct mental-health language. The emotion model can badly under-read terse
+# replies (a one-word "death" may come back near-neutral), so concerning words
+# floor the message sub-score and crisis words push it to the top. A check
+# engine light must never miss these.
+_CRISIS_TERMS = (
+    "suicid", "kill myself", "killing myself", "want to die", "end my life",
+    "hurt myself", "self harm", "self-harm", "better off dead", "no reason to live",
+)
+_CONCERN_TERMS = (
+    "death", "dying", "dead", "hopeless", "worthless", "empty", "numb",
+    "can't go on", "cant go on", "give up", "giving up", "no point", "end it",
+    "can't cope", "cant cope", "breaking down", "burnt out", "burned out",
+    "exhausted", "overwhelmed", "can't sleep", "cant sleep", "alone", "trapped",
+)
+
+# Over-reassurance is a classic burnout MASK — "I'm fine, really, don't worry,
+# all good." Taking it at face value is exactly how invisible burnout slips
+# through, so when several reassurance markers cluster we treat it as a flag.
+_MASKING_TERMS = (
+    "i'm fine", "im fine", "totally fine", "perfectly fine", "completely fine",
+    "i'm okay", "im okay", "i'm ok", "im ok", "i'm alright", "im alright",
+    "i'm good", "im good", "all good", "everything's fine", "everything is fine",
+    "everything's good", "everything is good", "don't worry", "dont worry",
+    "no worries", "it's nothing", "its nothing", "nothing's wrong", "nothing wrong",
+    "i'm not stressed", "im not stressed", "no big deal", "i'll be fine", "ill be fine",
+)
+
 _rag_engine = None  # lazy RagInterventionEngine singleton
 
 
@@ -70,6 +97,21 @@ class BurnoutScorer:
 
         # Behavioral burnout sub-scores (0-100; higher = more burnout signal).
         imsg = (1 - sentiment) * 100
+        # Concerning / crisis language overrides a soft emotion-model read.
+        text_l = (signals.get("response_text") or "").lower()
+        masking = 0
+        if any(t in text_l for t in _CRISIS_TERMS):
+            imsg = 100.0
+        else:
+            concern = sum(1 for t in _CONCERN_TERMS if t in text_l)
+            if concern:
+                imsg = max(imsg, min(88.0 + (concern - 1) * 4.0, 100.0))
+            # Clustered over-reassurance ("I'm fine, totally fine, don't worry")
+            # reads as positive to the emotion model but is a masking tell — pull
+            # it out of the green and into at least a yellow caution.
+            masking = sum(1 for t in _MASKING_TERMS if t in text_l)
+            if masking >= 2:
+                imsg = max(imsg, min(52.0 + masking * 7.0, 82.0))
         typing = (
             min(error_rate / 20, 1) * 0.40
             + (1 - min(wpm / 80, 1)) * 0.35
@@ -89,19 +131,31 @@ class BurnoutScorer:
         deviation = max(0.0, expected - actual)
         tribe = min(deviation * 100, 100)
 
-        # PRD §4.5 weighted fusion, renormalized over the streams present
-        # (a text-only check-in has no facial/voice).
+        # PRD §4.5 weighted fusion, renormalized over the streams ACTUALLY
+        # present. A text-only check-in (SMS) has no facial/voice and no real
+        # keystroke biometrics — fusing fake typing defaults would only dilute
+        # the one real signal (what they wrote), so typing is fused only when
+        # real typing data was captured (the in-app Pulse screen sends it).
         weights = {"imessage": 0.25, "typing": 0.20, "facial": 0.30, "voice": 0.15, "tribe": 0.10}
-        subs = {"imessage": imsg, "typing": typing, "tribe": tribe}
+        has_typing = "typing_wpm" in signals or "error_rate" in signals
+        subs = {"imessage": imsg, "tribe": tribe}
+        if has_typing:
+            subs["typing"] = typing
         if facial > 0:
             subs["facial"] = facial
         if voice > 0:
             subs["voice"] = voice
         total_w = sum(weights[k] for k in subs)
-        score = min(int(round(sum(subs[k] * weights[k] for k in subs) / total_w)), 100)
-        level = "green" if score < 30 else "yellow" if score < 65 else "red"
+        burnout = min(int(round(sum(subs[k] * weights[k] for k in subs) / total_w)), 100)
+        # Pegasus reports a WELLNESS score — HIGHER IS BETTER. Internally we fuse
+        # burnout/stress sub-scores, then flip so the number people see rises as
+        # they're doing better. green = thriving, red = running low.
+        score = 100 - burnout
+        level = "green" if score >= 70 else "yellow" if score >= 40 else "red"
 
         ind: List[str] = []
+        if masking >= 2:
+            ind.append("Strong reassurance — this can mask how you really feel")
         if error_rate > 10:
             ind.append("Elevated typing errors suggest cognitive strain")
         if rt > 8000:

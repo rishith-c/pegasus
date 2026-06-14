@@ -1,5 +1,6 @@
-// CheckEngine — the hero component. A large, living, pulsing score orb.
-// "Tesla dashboard for your mind": glowing ring, breathing pulse, calm numerals.
+// CheckEngine — the hero component. A large, living, pulsing wellness orb.
+// Score is 0..100 where higher = better. Glowing ring, breathing pulse, calm
+// numerals. "Tesla dashboard for your mind."
 import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -188,14 +189,15 @@ export default function CheckEngine({ score, level, size = 260 }: CheckEnginePro
   );
 }
 
+// Wellness label — higher score is better. Green thriving, red running low.
 function labelFor(level: BurnoutLevel): string {
   switch (level) {
     case "green":
-      return "CALM";
+      return "THRIVING";
     case "yellow":
-      return "ELEVATED";
+      return "STEADY";
     case "red":
-      return "BURNOUT RISK";
+      return "RUNNING LOW";
     default:
       return "";
   }

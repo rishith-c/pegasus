@@ -1,9 +1,10 @@
-// ScoreBreakdown — horizontal bars for the 5 burnout streams.
+// ScoreBreakdown — horizontal bars for the 5 signal streams.
 // Owned by Wesley (visual layer). "Tesla dashboard for your mind."
 //
-// Each labeled bar fills 0..100 and is colored by value (green → yellow → red),
-// so a glance reads strain consistently with the rest of the app. Bars animate
-// their width in on mount / when values change.
+// Each bar shows how much *strain* a single signal is contributing (higher =
+// more strain), so it reads independently of the overall wellness score. Bars
+// fill 0..100, colored low→high (green → yellow → red), and animate their width
+// in on mount / when values change.
 
 import React, { useEffect, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -122,6 +123,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   title: {
     ...TYPE.label,
@@ -150,7 +156,7 @@ const styles = StyleSheet.create({
   track: {
     height: 8,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.border,
+    backgroundColor: "rgba(0,0,0,0.06)",
     overflow: "hidden",
   },
   fill: {

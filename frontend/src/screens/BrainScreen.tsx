@@ -1,12 +1,11 @@
-// BrainScreen — "Your Brain Activity", a calm, futuristic readout of the live
-// neural map. We pull BrainData for the demo user, render the GPU brain point
-// cloud (Brain3D), and below it list the flagged regions in plain English.
+// BrainScreen — "Your Brain Activity", a calm, plain-English readout of the live
+// neural map. We pull BrainData for the demo user and, for each region, simply
+// state whether it's affected and what that means — no 3D, no jargon.
 //
-// A "Healthy Baseline" / "Your Pattern" toggle morphs the whole view: in
-// Baseline mode every region is shown at a calm resting activation so you can
-// see what a settled brain looks like; in Your Pattern mode we show the real
-// measured activations. The brain colors and the flagged-region cards animate
-// between the two states.
+// A "Your Pattern" / "Healthy Baseline" toggle drives the numbers: in Baseline
+// mode every region is shown at a calm resting activation so you can see what a
+// settled brain reads like; in Your Pattern mode we show the real measured
+// activations. Regions are ordered most-affected first.
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,19 +17,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  Easing,
-  interpolateColor,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 
-import Brain3D from "../components/Brain3D";
 import { getBrainData } from "../services/api";
 import { DEFAULT_USER_ID } from "../services/config";
 import { BrainData } from "../types";
 import { COLORS, RADIUS, SPACING, TYPE } from "../utils/colors";
+import ScrollEdgeFade from "../components/ScrollEdgeFade";
 
 type RegionKey = keyof BrainData["regions"];
 
@@ -67,7 +59,8 @@ const REGION_INFO: Record<
   },
 };
 
-// Display order — most stress-relevant first.
+// Stable tie-break order — most stress-relevant first. Used when two regions
+// read the same activation, so the list never jitters between renders.
 const REGION_ORDER: RegionKey[] = [
   "amygdala_region",
   "prefrontal_cortex",
@@ -76,8 +69,10 @@ const REGION_ORDER: RegionKey[] = [
   "visual_cortex",
 ];
 
-// A region counts as "flagged" once its activation crosses this threshold.
-const FLAG_THRESHOLD = 0.6;
+// Thresholds. At/above HOT a region is "Affected"; at/above WARM it's
+// "Elevated"; below that it's "Calm".
+const HOT_THRESHOLD = 0.6;
+const WARM_THRESHOLD = 0.4;
 
 // Calm resting activations used for the "Healthy Baseline" view. Low and even —
 // what a settled brain looks like.
@@ -89,11 +84,29 @@ const BASELINE: BrainData["regions"] = {
   visual_cortex: 0.26,
 };
 
-// Activation 0..1 -> accent. Calm blue, then yellow, then red — mirrors Brain3D.
-function activationAccent(a: number): string {
-  if (a >= FLAG_THRESHOLD) return COLORS.red;
-  if (a >= 0.4) return COLORS.yellow;
-  return COLORS.blue;
+type Status = {
+  label: string; // pill + headline word, e.g. "Affected"
+  accent: string; // bar + pill color
+  tint: string; // pill background wash
+};
+
+// Activation 0..1 -> status. Red "Affected", amber "Elevated", green "Calm".
+function statusFor(a: number): Status {
+  if (a >= HOT_THRESHOLD) {
+    return { label: "Affected", accent: COLORS.red, tint: "rgba(255,59,48,0.12)" };
+  }
+  if (a >= WARM_THRESHOLD) {
+    return { label: "Elevated", accent: COLORS.yellow, tint: "rgba(255,159,10,0.14)" };
+  }
+  return { label: "Calm", accent: COLORS.green, tint: "rgba(52,199,89,0.14)" };
+}
+
+// One-line, human verdict for a region given its activation.
+function verdictFor(name: string, a: number): string {
+  if (a >= HOT_THRESHOLD) return `${name} — affected. This region is reading hot.`;
+  if (a >= WARM_THRESHOLD)
+    return `${name} — slightly elevated. Worth keeping an eye on.`;
+  return `${name} — calm. Sitting in a healthy range.`;
 }
 
 export default function BrainScreen() {
@@ -104,9 +117,6 @@ export default function BrainScreen() {
   const [error, setError] = useState<string | null>(null);
   // false = "Your Pattern" (live data), true = "Healthy Baseline".
   const [baseline, setBaseline] = useState(false);
-
-  // Drives the toggle pill + card color crossfade. 0 = Your Pattern, 1 = Baseline.
-  const morph = useSharedValue(0);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -121,22 +131,28 @@ export default function BrainScreen() {
     load();
   }, [load]);
 
-  useEffect(() => {
-    morph.value = withTiming(baseline ? 1 : 0, {
-      duration: 520,
-      easing: Easing.inOut(Easing.cubic),
+  // The region set fed to the cards. Baseline mode shows calm resting values;
+  // otherwise the measured data.
+  const shownRegions = baseline ? BASELINE : brain?.regions ?? null;
+
+  // Regions sorted most-affected first; ties broken by REGION_ORDER.
+  const ranked = useMemo(() => {
+    if (!shownRegions) return [];
+    return [...REGION_ORDER].sort((a, b) => {
+      const diff = (shownRegions[b] ?? 0) - (shownRegions[a] ?? 0);
+      if (diff !== 0) return diff;
+      return REGION_ORDER.indexOf(a) - REGION_ORDER.indexOf(b);
     });
-  }, [baseline, morph]);
+  }, [shownRegions]);
 
-  // The region set fed to the brain + cards. In baseline mode the cloud rebuilds
-  // its colors from the calm resting values; otherwise from the measured data.
-  const liveRegions = brain?.regions ?? null;
-  const shownRegions = baseline ? BASELINE : liveRegions;
-
-  const flagged = useMemo(() => {
-    if (!liveRegions) return [];
-    return REGION_ORDER.filter((k) => (liveRegions[k] ?? 0) >= FLAG_THRESHOLD);
-  }, [liveRegions]);
+  // How many regions are reading hot — drives the summary line.
+  const hotCount = useMemo(
+    () =>
+      shownRegions
+        ? REGION_ORDER.filter((k) => (shownRegions[k] ?? 0) >= HOT_THRESHOLD).length
+        : 0,
+    [shownRegions]
+  );
 
   // First load: calm, minimal spinner.
   if (loading && !brain) {
@@ -168,6 +184,11 @@ export default function BrainScreen() {
     );
   }
 
+  const summaryText =
+    hotCount === 0
+      ? "All regions calm"
+      : `${hotCount} region${hotCount === 1 ? "" : "s"} reading hot`;
+
   return (
     <View style={styles.root}>
       <ScrollView
@@ -194,45 +215,38 @@ export default function BrainScreen() {
           </View>
         </View>
 
-        {/* 3D brain */}
-        <View style={styles.brainCard}>
-          {shownRegions ? (
-            <Brain3D regions={shownRegions} />
-          ) : (
-            <View style={styles.brainEmpty}>
-              <Text style={styles.brainEmptyText}>No neural data yet.</Text>
-            </View>
-          )}
+        {/* Summary banner */}
+        <View style={styles.summaryCard}>
+          <View
+            style={[
+              styles.summaryDot,
+              { backgroundColor: hotCount === 0 ? COLORS.green : COLORS.red },
+            ]}
+          />
+          <Text style={styles.summaryText}>{summaryText}</Text>
         </View>
 
-        {/* Baseline / Your Pattern toggle */}
-        <ModeToggle
-          baseline={baseline}
-          morph={morph}
-          onSelect={setBaseline}
-        />
+        {/* Your Pattern / Healthy Baseline toggle (drives the readout) */}
+        <ModeToggle baseline={baseline} onSelect={setBaseline} />
 
-        {/* Flagged regions */}
+        {/* Per-region readout — most affected first */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>FLAGGED REGIONS</Text>
+          <Text style={styles.sectionLabel}>AFFECTED REGIONS</Text>
 
-          {flagged.length === 0 ? (
-            <View style={styles.clearCard}>
-              <View style={[styles.clearDot, { backgroundColor: COLORS.green }]} />
-              <Text style={styles.clearText}>
-                Nothing flagged. Your regions are reading within a calm range.
-              </Text>
-            </View>
-          ) : (
+          {shownRegions ? (
             <View style={styles.regionList}>
-              {flagged.map((key) => (
+              {ranked.map((key) => (
                 <RegionCard
                   key={key}
                   region={key}
-                  live={liveRegions?.[key] ?? 0}
-                  morph={morph}
+                  activation={shownRegions[key] ?? 0}
                 />
               ))}
+            </View>
+          ) : (
+            <View style={styles.summaryCard}>
+              <View style={[styles.summaryDot, { backgroundColor: COLORS.textDim }]} />
+              <Text style={styles.summaryText}>No neural data yet.</Text>
             </View>
           )}
         </View>
@@ -246,68 +260,44 @@ export default function BrainScreen() {
           </Text>
         )}
       </ScrollView>
+
+      {/* Frosted top/bottom bands — content blurs softly as it scrolls under. */}
+      <ScrollEdgeFade topInset={insets.top} />
     </View>
   );
 }
 
-// Segmented toggle. A reanimated highlight slides between the two modes; the
-// `morph` value (shared with the cards) keeps everything visually in sync.
+// Plain segmented control — no animation, just clean state. Selecting a segment
+// swaps the activations the cards read from.
 function ModeToggle({
   baseline,
-  morph,
   onSelect,
 }: {
   baseline: boolean;
-  morph: Animated.SharedValue<number>;
   onSelect: (baseline: boolean) => void;
 }) {
-  const thumbStyle = useAnimatedStyle(() => ({
-    left: `${morph.value * 50}%`,
-    backgroundColor: interpolateColor(
-      morph.value,
-      [0, 1],
-      ["rgba(59, 130, 246, 0.18)", "rgba(34, 197, 94, 0.18)"]
-    ),
-    borderColor: interpolateColor(
-      morph.value,
-      [0, 1],
-      [COLORS.blue, COLORS.green]
-    ),
-  }));
-
   return (
     <View style={styles.toggleWrap}>
       <View style={styles.toggleTrack}>
-        <Animated.View style={[styles.toggleThumb, thumbStyle]} />
         <Pressable
-          style={styles.toggleSeg}
+          style={[styles.toggleSeg, !baseline && styles.toggleSegActive]}
           onPress={() => onSelect(false)}
           accessibilityRole="button"
           accessibilityState={{ selected: !baseline }}
           accessibilityLabel="Show your pattern"
         >
-          <Text
-            style={[
-              styles.toggleText,
-              !baseline && { color: COLORS.text },
-            ]}
-          >
+          <Text style={[styles.toggleText, !baseline && styles.toggleTextActive]}>
             Your Pattern
           </Text>
         </Pressable>
         <Pressable
-          style={styles.toggleSeg}
+          style={[styles.toggleSeg, baseline && styles.toggleSegActive]}
           onPress={() => onSelect(true)}
           accessibilityRole="button"
           accessibilityState={{ selected: baseline }}
           accessibilityLabel="Show healthy baseline"
         >
-          <Text
-            style={[
-              styles.toggleText,
-              baseline && { color: COLORS.text },
-            ]}
-          >
+          <Text style={[styles.toggleText, baseline && styles.toggleTextActive]}>
             Healthy Baseline
           </Text>
         </Pressable>
@@ -316,100 +306,46 @@ function ModeToggle({
   );
 }
 
-// One flagged region. Its accent crossfades between the calm baseline color and
-// the measured (hot) color as the mode toggles, and the activation bar animates
-// its width + tint to match.
+// One region, stated plainly: name + status pill, a thin activation bar, the
+// one-line verdict, and the gentle description of what this region does.
 function RegionCard({
   region,
-  live,
-  morph,
+  activation,
 }: {
   region: RegionKey;
-  live: number;
-  morph: Animated.SharedValue<number>;
+  activation: number;
 }) {
   const info = REGION_INFO[region];
-  const baselineVal = BASELINE[region] ?? 0;
-  const liveAccent = activationAccent(live);
-  const baselineAccent = activationAccent(baselineVal);
-
-  // Width % and accent both interpolate from the live (Your Pattern) reading to
-  // the calm baseline reading as morph goes 0 -> 1.
-  const barStyle = useAnimatedStyle(() => ({
-    width: `${(live + (baselineVal - live) * morph.value) * 100}%`,
-    backgroundColor: interpolateColor(
-      morph.value,
-      [0, 1],
-      [liveAccent, baselineAccent]
-    ),
-  }));
-
-  const dotStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      morph.value,
-      [0, 1],
-      [liveAccent, baselineAccent]
-    ),
-  }));
+  const status = statusFor(activation);
+  const pct = Math.round(activation * 100);
 
   return (
     <View style={styles.regionCard}>
       <View style={styles.regionHeader}>
-        <Animated.View style={[styles.regionDot, dotStyle]} />
         <Text style={styles.regionName}>{info.name}</Text>
-        <AnimatedPct
-          live={live}
-          baseline={baselineVal}
-          morph={morph}
-          fromColor={liveAccent}
-          toColor={baselineAccent}
-        />
+        <View style={[styles.pill, { backgroundColor: status.tint }]}>
+          <View style={[styles.pillDot, { backgroundColor: status.accent }]} />
+          <Text style={[styles.pillText, { color: status.accent }]}>
+            {status.label}
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.barTrack}>
-        <Animated.View style={[styles.barFill, barStyle]} />
+      <View style={styles.barRow}>
+        <View style={styles.barTrack}>
+          <View
+            style={[
+              styles.barFill,
+              { width: `${pct}%`, backgroundColor: status.accent },
+            ]}
+          />
+        </View>
+        <Text style={[styles.barPct, { color: status.accent }]}>{pct}%</Text>
       </View>
 
+      <Text style={styles.regionVerdict}>{verdictFor(info.name, activation)}</Text>
       <Text style={styles.regionPlain}>{info.plain}</Text>
     </View>
-  );
-}
-
-// The numeric percentage label. Reanimated can't drive text content from the UI
-// thread, so we poll the shared `morph` value on the JS thread to tween the
-// number, and animate the text color in lockstep via interpolateColor.
-function AnimatedPct({
-  live,
-  baseline,
-  morph,
-  fromColor,
-  toColor,
-}: {
-  live: number;
-  baseline: number;
-  morph: Animated.SharedValue<number>;
-  fromColor: string;
-  toColor: string;
-}) {
-  const [shown, setShown] = useState(Math.round(live * 100));
-
-  const colorStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(morph.value, [0, 1], [fromColor, toColor]),
-  }));
-
-  // Poll the morph value until it settles into its target mode, updating the
-  // displayed integer percentage as it tweens.
-  useEffect(() => {
-    const id = setInterval(() => {
-      const v = morph.value;
-      setShown(Math.round((live + (baseline - live) * v) * 100));
-      if (v <= 0.001 || v >= 0.999) clearInterval(id);
-    }, 32);
-    return () => clearInterval(id);
-  }, [live, baseline, morph]);
-
-  return (
-    <Animated.Text style={[styles.regionPct, colorStyle]}>{shown}%</Animated.Text>
   );
 }
 
@@ -492,24 +428,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
 
-  // 3D brain card
-  brainCard: {
-    height: 320,
-    borderRadius: RADIUS.lg,
+  // Summary banner
+  summaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.card,
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    overflow: "hidden",
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
-  brainEmpty: {
+  summaryDot: {
+    width: 9,
+    height: 9,
+    borderRadius: RADIUS.pill,
+    marginRight: SPACING.md,
+  },
+  summaryText: {
+    ...TYPE.heading,
+    color: COLORS.text,
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.card,
-  },
-  brainEmptyText: {
-    ...TYPE.body,
-    color: COLORS.textDim,
   },
 
   // Toggle
@@ -523,32 +467,26 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.pill,
     padding: 4,
-    position: "relative",
-  },
-  toggleThumb: {
-    position: "absolute",
-    top: 4,
-    bottom: 4,
-    // Half the track minus the 4px outer padding on each side, so the thumb
-    // sits flush inside whichever half `left` (0% or 50%) places it.
-    width: "50%",
-    marginHorizontal: 4,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
   },
   toggleSeg: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: SPACING.md,
-    zIndex: 1,
+    borderRadius: RADIUS.pill,
+  },
+  toggleSegActive: {
+    backgroundColor: "rgba(0,113,227,0.10)",
   },
   toggleText: {
     ...TYPE.label,
     color: COLORS.textDim,
   },
+  toggleTextActive: {
+    color: COLORS.blue,
+  },
 
-  // Flagged regions
+  // Region readout
   section: {
     marginTop: SPACING.xl,
   },
@@ -567,65 +505,73 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
     padding: SPACING.lg,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
   regionHeader: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  regionDot: {
-    width: 9,
-    height: 9,
-    borderRadius: RADIUS.pill,
-    marginRight: SPACING.sm,
   },
   regionName: {
     ...TYPE.heading,
     color: COLORS.text,
     flex: 1,
   },
-  regionPct: {
-    ...TYPE.heading,
-    fontVariant: ["tabular-nums"],
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: RADIUS.pill,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
   },
-  barTrack: {
+  pillDot: {
+    width: 6,
     height: 6,
     borderRadius: RADIUS.pill,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    marginRight: SPACING.xs + 2,
+  },
+  pillText: {
+    ...TYPE.label,
+    letterSpacing: 0.2,
+  },
+  barRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: SPACING.md,
+  },
+  barTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(0,0,0,0.06)",
     overflow: "hidden",
   },
   barFill: {
     height: "100%",
     borderRadius: RADIUS.pill,
   },
+  barPct: {
+    ...TYPE.label,
+    fontVariant: ["tabular-nums"],
+    marginLeft: SPACING.md,
+    width: 40,
+    textAlign: "right",
+  },
+  regionVerdict: {
+    ...TYPE.body,
+    fontWeight: "600",
+    color: COLORS.text,
+    lineHeight: 22,
+    marginTop: SPACING.md,
+  },
   regionPlain: {
     ...TYPE.body,
     color: COLORS.textDim,
     lineHeight: 22,
-    marginTop: SPACING.md,
-  },
-
-  // Clear (nothing flagged)
-  clearCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
-  },
-  clearDot: {
-    width: 9,
-    height: 9,
-    borderRadius: RADIUS.pill,
-    marginRight: SPACING.md,
-  },
-  clearText: {
-    ...TYPE.body,
-    color: COLORS.textDim,
-    flex: 1,
-    lineHeight: 22,
+    marginTop: SPACING.xs,
   },
 
   meanFootnote: {

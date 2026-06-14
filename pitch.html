@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pegasus</title>
+
+<!-- Fonts: Inter (body/UI) + Instrument Serif (display) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+
+<style>
+  /* =========================================================================
+     PEGASUS — PITCH DECK SKELETON
+     Premium / editorial / restrained. Dark, neuroscience credibility.
+
+     PALETTE
+       --bg        #0a0a0a   page background
+       --card      #12121a   surface / card
+       --border    #23232e   hairlines
+       --text      #f5f5f7   primary text
+       --dim       #9aa0aa   secondary text
+       --green     #22c55e   accent (positive / signal)
+       --yellow    #eab308   accent (attention / EEG)
+       --red       #ef4444   accent (alarm / problem)
+       --blue      #3b82f6   accent (data / model)
+
+     TYPE
+       Display headlines   -> Instrument Serif (var --serif)
+       Everything else     -> Inter (var --sans)
+     ========================================================================= */
+
+  :root {
+    --bg:     #0a0a0a;
+    --card:   #12121a;
+    --border: #23232e;
+    --text:   #f5f5f7;
+    --dim:    #9aa0aa;
+
+    --green:  #22c55e;
+    --yellow: #eab308;
+    --red:    #ef4444;
+    --blue:   #3b82f6;
+
+    --sans:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+
+    --maxw: 1000px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 400;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden; /* the .deck owns scrolling */
+  }
+
+  /* -------------------------------------------------------------------------
+     BACKGROUND — radial glow + faint grain. Fixed, behind everything.
+     ------------------------------------------------------------------------- */
+  .bg-glow,
+  .bg-grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bg-glow {
+    background:
+      radial-gradient(60% 50% at 18% 12%, rgba(59,130,246,0.10), transparent 70%),
+      radial-gradient(55% 45% at 85% 90%, rgba(34,197,94,0.07), transparent 70%);
+  }
+  .bg-grain {
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* -------------------------------------------------------------------------
+     PROGRESS BAR (fixed, top) + SLIDE COUNTER (fixed, bottom-right)
+     ------------------------------------------------------------------------- */
+  .progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    width: 0%;
+    background: linear-gradient(90deg, var(--blue), var(--green));
+    z-index: 100;
+    transition: width 0.12s linear;
+  }
+  .counter {
+    position: fixed;
+    bottom: 22px; right: 26px;
+    z-index: 100;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+  .counter b { color: var(--text); font-weight: 600; }
+
+  /* -------------------------------------------------------------------------
+     DECK — scroll container with Y-axis scroll-snap
+     ------------------------------------------------------------------------- */
+  .deck {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+  .deck::-webkit-scrollbar { display: none; }
+
+  /* -------------------------------------------------------------------------
+     SLIDE — >= full viewport, centered flex column
+     ------------------------------------------------------------------------- */
+  .slide {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 90px 56px;
+    position: relative;
+  }
+  .slide > * { width: 100%; max-width: var(--maxw); margin-left: auto; margin-right: auto; }
+  .slide.center { align-items: center; text-align: center; }
+
+  /* -------------------------------------------------------------------------
+     TYPE PRIMITIVES
+       eyebrow  small-caps accent label above a headline
+       display  huge serif headline
+       lead     subhead / standfirst
+       body     paragraph copy
+     ------------------------------------------------------------------------- */
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 22px;
+  }
+  .display {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(44px, 7.5vw, 92px);
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    margin-bottom: 26px;
+  }
+  .display em { font-style: italic; }
+  .lead {
+    font-size: clamp(20px, 2.4vw, 28px);
+    font-weight: 300;
+    line-height: 1.4;
+    color: var(--text);
+    max-width: 760px;
+    margin-bottom: 18px;
+  }
+  .body {
+    font-size: 17px;
+    color: var(--dim);
+    max-width: 680px;
+  }
+  .body + .body { margin-top: 14px; }
+
+  /* -------------------------------------------------------------------------
+     GRID + CARD — responsive auto-fit card layout
+     ------------------------------------------------------------------------- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+    margin-top: 40px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px;
+    text-align: left;
+  }
+  .card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+  .card p { font-size: 15px; color: var(--dim); line-height: 1.5; }
+
+  /* -------------------------------------------------------------------------
+     CHIP — small inline pill / tag
+     ------------------------------------------------------------------------- */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 13px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.02);
+    font-size: 13px;
+    color: var(--dim);
+    letter-spacing: 0.01em;
+  }
+
+  /* -------------------------------------------------------------------------
+     METRIC — big number + label
+     ------------------------------------------------------------------------- */
+  .metric .num {
+    font-family: var(--serif);
+    font-size: clamp(40px, 5.5vw, 68px);
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .metric .label {
+    margin-top: 12px;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  /* -------------------------------------------------------------------------
+     LOGOS
+       logo       <img> brand mark, 34px tall (simpleicons CDN)
+       logo-row   flex-wrap row of logos
+       logo-text  text pill for brands not on simpleicons
+     ------------------------------------------------------------------------- */
+  .logo {
+    height: 34px;
+    width: auto;
+    display: inline-block;
+    opacity: 0.92;
+  }
+  .logo-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 34px;
+    margin-top: 36px;
+  }
+  .logo-text {
+    display: inline-flex;
+    align-items: center;
+    height: 34px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  /* -------------------------------------------------------------------------
+     PIPELINE — horizontal flow of nodes joined by arrows
+       pipeline  flex container (wraps)
+       node      a box / stage in the flow
+       arrow     connector glyph between nodes
+     ------------------------------------------------------------------------- */
+  .pipeline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-top: 40px;
+  }
+  .node {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .node small { display: block; font-weight: 400; font-size: 12px; color: var(--dim); margin-top: 3px; }
+  .arrow {
+    color: var(--dim);
+    font-size: 20px;
+    line-height: 1;
+    user-select: none;
+  }
+
+  /* -------------------------------------------------------------------------
+     STEP — numbered list item
+     ------------------------------------------------------------------------- */
+  .step {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+  }
+  .step .n {
+    font-family: var(--serif);
+    font-size: 30px;
+    line-height: 1;
+    color: var(--dim);
+    min-width: 44px;
+  }
+  .step .t h3 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .step .t p { font-size: 15px; color: var(--dim); }
+
+  /* -------------------------------------------------------------------------
+     ACCENT TEXT COLORS
+     ------------------------------------------------------------------------- */
+  .accent-green  { color: var(--green); }
+  .accent-yellow { color: var(--yellow); }
+  .accent-red    { color: var(--red); }
+  .accent-blue   { color: var(--blue); }
+
+  /* -------------------------------------------------------------------------
+     LIGHT — glowing status dot (compose with an accent color via currentColor)
+       e.g. <span class="light accent-green"></span>
+     ------------------------------------------------------------------------- */
+  .light {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent),
+                0 0 12px 1px currentColor;
+    vertical-align: middle;
+  }
+
+  /* -------------------------------------------------------------------------
+     RESPONSIVE
+     ------------------------------------------------------------------------- */
+  @media (max-width: 640px) {
+    .slide { padding: 72px 24px; }
+    .logo-row { gap: 22px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .deck { scroll-behavior: auto; }
+    .progress { transition: none; }
+  }
+</style>
+</head>
+
+<body>
+  <!-- Background layers -->
+  <div class="bg-glow"></div>
+  <div class="bg-grain"></div>
+
+  <!-- Progress + counter (driven by inline script) -->
+  <div class="progress" id="progress"></div>
+  <div class="counter"><b id="counter-current">1</b> / <span id="counter-total">1</span></div>
+
+  <!-- Scroll container. Slides are injected at the marker below. -->
+  <main class="deck" id="deck">
+    <!-- SLIDES_GO_HERE -->
+  </main>
+
+  <script>
+    (function () {
+      var deck = document.getElementById('deck');
+      var progress = document.getElementById('progress');
+      var current = document.getElementById('counter-current');
+      var total = document.getElementById('counter-total');
+
+      function slides() {
+        return Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+      }
+
+      // --- progress bar + slide counter ------------------------------------
+      function update() {
+        var max = deck.scrollHeight - deck.clientHeight;
+        var pct = max > 0 ? (deck.scrollTop / max) * 100 : 0;
+        progress.style.width = pct + '%';
+
+        var list = slides();
+        total.textContent = list.length;
+        var mid = deck.scrollTop + deck.clientHeight / 2;
+        var idx = 0;
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].offsetTop <= mid) idx = i;
+        }
+        current.textContent = idx + 1;
+      }
+
+      deck.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+      update();
+
+      // --- keyboard navigation ---------------------------------------------
+      function go(dir) {
+        var list = slides();
+        if (!list.length) return;
+        var mid = deck.scrollTop + deck.clientHeight / 2;
+        var idx = 0;
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].offsetTop <= mid) idx = i;
+        }
+        var next = Math.max(0, Math.min(list.length - 1, idx + dir));
+        list[next].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      document.addEventListener('keydown', function (e) {
+        switch (e.key) {
+          case 'ArrowDown':
+          case 'ArrowRight':
+          case ' ':
+          case 'PageDown':
+            e.preventDefault();
+            go(1);
+            break;
+          case 'ArrowUp':
+          case 'ArrowLeft':
+          case 'PageUp':
+            e.preventDefault();
+            go(-1);
+            break;
+          case 'Home':
+            e.preventDefault();
+            (slides()[0] || deck).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            break;
+          case 'End':
+            e.preventDefault();
+            var l = slides();
+            (l[l.length - 1] || deck).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            break;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

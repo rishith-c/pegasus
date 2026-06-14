@@ -82,3 +82,29 @@ export interface VideoResult {
   voice: VoiceAnalysis;
   combined_score: number;
 }
+
+// One turn in the companion conversation (Talk tab). Sent to the ML /chat
+// endpoint and rendered as a bubble.
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+// One past reading (check-in or talk) shown in the History tab.
+export interface HistoryEntry {
+  score: number;
+  level: "green" | "yellow" | "red";
+  timestamp: string;
+  text: string;
+  intervention: string;
+  kind: "talk" | "check-in";
+}
+
+// Returned by POST /converse (video service): one spoken turn of the voice call.
+export interface ConverseResult {
+  transcript: string; // what the user said (NVIDIA parakeet STT)
+  reply: string; // Pegasus's reply text
+  voice: Partial<VoiceAnalysis> & { error?: string }; // per-turn voice-stress read
+  audio_b64: string | null; // reply spoken aloud (NVIDIA Chatterbox), base64 WAV
+  sample_rate: number;
+}

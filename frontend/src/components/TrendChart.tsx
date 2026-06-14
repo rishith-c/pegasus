@@ -1,6 +1,7 @@
-// TrendChart — burnout score history as a calm, dark line chart.
-// Wraps react-native-chart-kit's LineChart. The line is tinted by the
-// burnout zone of the most recent score (green / yellow / red).
+// TrendChart — wellness score history as a calm line chart.
+// Wraps react-native-chart-kit's LineChart. Score is 0..100 where higher is
+// better; the line is tinted by the wellness zone of the most recent score
+// (green = thriving, yellow = neutral, red = running low).
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { LineChart } from "react-native-chart-kit";
@@ -14,11 +15,12 @@ interface TrendChartProps {
   labels?: string[];
 }
 
-// Burnout score zone -> accent hex. Higher score = more burnout.
+// Wellness score zone -> accent hex. Higher score = better, matching the
+// backend thresholds and levelColor (green >= 70, yellow >= 40, else red).
 function zoneColor(score: number): string {
-  if (score >= 70) return COLORS.red;
+  if (score >= 70) return COLORS.green;
   if (score >= 40) return COLORS.yellow;
-  return COLORS.green;
+  return COLORS.red;
 }
 
 // chart-kit expects a color function: (opacity) => rgba string.
@@ -73,7 +75,7 @@ export default function TrendChart({ scores, labels }: TrendChartProps) {
         <View style={[styles.placeholder, { height: CHART_HEIGHT }]}>
           <Text style={styles.placeholderTitle}>Not enough data yet</Text>
           <Text style={styles.placeholderBody}>
-            Check in a few more times to see your burnout trend.
+            Check in a few more times to see your wellness trend.
           </Text>
         </View>
       </View>
@@ -127,6 +129,11 @@ const styles = StyleSheet.create({
     paddingVertical: CARD_PADDING,
     paddingHorizontal: CARD_PADDING,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   chart: {
     marginVertical: 0,

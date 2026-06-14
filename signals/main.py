@@ -178,13 +178,49 @@ async def send_checkin(req: CheckinRequest):
         raise HTTPException(500, str(e))
 
 
+class ReminderRequest(BaseModel):
+    user_id: str
+    text: str
+
+
+@app.post("/schedule-reminder")
+def schedule_reminder_route(req: ReminderRequest):
+    """Parse a reminder from free text ('text me in 15 min to take a break') and
+    schedule an SMS to the user's registered phone. Used by the voice call."""
+    from sms_bot.reminders import parse_reminder, schedule_reminder, human_delay
+    rem = parse_reminder(req.text)
+    if not rem:
+        return {"scheduled": False, "reason": "no_reminder"}
+    phone = USER_PHONES.get(req.user_id)
+    if not phone:
+        return {"scheduled": False, "reason": "no_phone"}
+    delay, task = rem
+    schedule_reminder(phone, delay, task)
+    return {"scheduled": True, "delay": delay, "task": task, "human": human_delay(delay)}
+
+
 @app.post("/sms/webhook")
 async def sms_webhook(request: Request):
-    """Bloo.io inbound SMS webhook — register this URL in Bloo.io dashboard."""
+    """Bloo.io inbound webhook. Payload is a flat WebhookEventPayload with
+    `event`, `sender` (phone), and `text`. We only act on genuine inbound
+    messages — ignore our own outbound echoes + delivery/status events so we
+    don't score messages Pegasus itself sent."""
     payload     = await request.json()
-    from_number = payload.get("from") or payload.get("sender") or payload.get("phone", "")
+    event       = (payload.get("event") or "").lower()
+    if event and event not in ("message.received", "message.inbound"):
+        return {"status": "ignored", "event": event}
+    from_number = payload.get("sender") or payload.get("from") or payload.get("phone", "")
     body        = payload.get("text") or payload.get("body") or payload.get("message", "")
+    if not from_number or not body:
+        return {"status": "ignored", "reason": "missing sender/text"}
     return await handle_incoming_sms(from_number, body)
+
+
+@app.on_event("startup")
+async def _start_imessage_inbound():
+    """Read the user's iMessage replies locally (Bloo.io webhook replacement)."""
+    from sms_bot.imessage_poller import start
+    start()
 
 
 if __name__ == "__main__":

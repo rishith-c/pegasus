@@ -260,7 +260,7 @@ function PermissionGate({
           ]}
         >
           {busy ? (
-            <ActivityIndicator color={COLORS.bg} />
+            <ActivityIndicator color="#ffffff" />
           ) : (
             <Text style={styles.primaryBtnLabel} allowFontScaling={false}>
               {denied ? "Try again" : "Enable camera & mic"}
@@ -432,7 +432,7 @@ function AnalyzingView() {
         <Animated.View style={[styles.brainHalo, haloStyle]} />
         <Animated.View style={[styles.brainCore, coreStyle]}>
           <LinearGradient
-            colors={["rgba(59,130,246,0.4)", "rgba(59,130,246,0.08)", COLORS.card]}
+            colors={["rgba(0,113,227,0.32)", "rgba(0,113,227,0.08)", COLORS.card]}
             start={{ x: 0.3, y: 0.2 }}
             end={{ x: 0.8, y: 0.9 }}
             style={StyleSheet.absoluteFill}
@@ -674,6 +674,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SPACING.xl,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
   },
   gateIcon: {
     width: 64,
@@ -721,7 +726,7 @@ const styles = StyleSheet.create({
   // ---- Buttons ----
   primaryBtn: {
     width: "100%",
-    backgroundColor: COLORS.text,
+    backgroundColor: COLORS.blue,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.md,
     alignItems: "center",
@@ -730,7 +735,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnLabel: {
     ...TYPE.body,
-    color: COLORS.bg,
+    color: "#ffffff",
     fontWeight: "700",
   },
   secondaryBtn: {
@@ -766,14 +771,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   promptEyebrow: {
+    // Over the live camera feed — stays light-on-dark for legibility.
     ...TYPE.label,
-    color: COLORS.textDim,
+    color: "rgba(255,255,255,0.85)",
     letterSpacing: 2,
     marginBottom: SPACING.sm,
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   promptText: {
+    // Over the live camera feed — stays white for legibility.
     ...TYPE.heading,
-    color: COLORS.text,
+    color: "#ffffff",
     textAlign: "center",
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 0, height: 1 },
@@ -792,8 +802,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   ovalHint: {
+    // Over the live camera feed — stays light-on-dark for legibility.
     ...TYPE.caption,
-    color: COLORS.textDim,
+    color: "rgba(255,255,255,0.8)",
     marginTop: SPACING.lg,
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 0, height: 1 },
@@ -848,19 +859,20 @@ const styles = StyleSheet.create({
     marginRight: SPACING.sm,
   },
   recTime: {
+    // Shown over the live camera feed while recording — white for legibility.
     ...TYPE.heading,
-    color: COLORS.text,
+    color: "#ffffff",
     fontVariant: ["tabular-nums"],
   },
   ringTrack: {
     borderWidth: 3,
-    borderColor: "rgba(239,68,68,0.35)",
+    borderColor: "rgba(255,59,48,0.35)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACING.lg,
   },
   ringFill: {
-    backgroundColor: "rgba(239,68,68,0.25)",
+    backgroundColor: "rgba(255,59,48,0.25)",
     borderWidth: 2,
     borderColor: COLORS.red,
   },
@@ -976,6 +988,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     marginBottom: SPACING.md,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   cardTitle: {
     ...TYPE.label,
@@ -1002,7 +1019,7 @@ const styles = StyleSheet.create({
   barTrack: {
     height: 6,
     borderRadius: RADIUS.pill,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(0,0,0,0.08)",
     overflow: "hidden",
   },
   barFill: {

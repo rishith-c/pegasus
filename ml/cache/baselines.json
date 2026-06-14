@@ -1,0 +1,156 @@
+{
+  "audio_01": {
+    "stimulus_id": "audio_01",
+    "regions": {
+      "prefrontal_cortex": 0.159,
+      "amygdala_region": 0.0,
+      "temporal_lobe": 0.325,
+      "motor_cortex": 0.471,
+      "visual_cortex": 0.0
+    },
+    "macro_groups": {
+      "Attention": 0.129,
+      "Auditory": 0.46,
+      "Emotion": 0.0,
+      "Language": 0.189,
+      "Motor": 0.471,
+      "Visual": 0.0
+    },
+    "overall": 0.208,
+    "total_timesteps": 6,
+    "agent_summary": "TRIBE v2 cortical trajectory: 6 timesteps (TR=1.49s), peak at t=1. Dominant macro groups at peak: Motor (0.47), Auditory (0.46), Language (0.19). fMRI predictions averaged over Yeo 7-network parcellation; hemodynamic lag (~5s) already compensated by TRIBE.",
+    "source": "tribe-v2"
+  },
+  "img_calm_02": {
+    "stimulus_id": "img_calm_02",
+    "regions": {
+      "prefrontal_cortex": 0.162,
+      "amygdala_region": 0.0,
+      "temporal_lobe": 0.306,
+      "motor_cortex": 0.448,
+      "visual_cortex": 0.019
+    },
+    "macro_groups": {
+      "Attention": 0.16,
+      "Auditory": 0.449,
+      "Emotion": 0.0,
+      "Language": 0.163,
+      "Motor": 0.448,
+      "Visual": 0.019
+    },
+    "overall": 0.207,
+    "total_timesteps": 6,
+    "agent_summary": "TRIBE v2 cortical trajectory: 6 timesteps (TR=1.49s), peak at t=1. Dominant macro groups at peak: Auditory (0.45), Motor (0.45), Language (0.16). fMRI predictions averaged over Yeo 7-network parcellation; hemodynamic lag (~5s) already compensated by TRIBE.",
+    "source": "tribe-v2"
+  },
+  "img_calm_03": {
+    "stimulus_id": "img_calm_03",
+    "regions": {
+      "prefrontal_cortex": 0.115,
+      "amygdala_region": 0.0,
+      "temporal_lobe": 0.24,
+      "motor_cortex": 0.357,
+      "visual_cortex": 0.051
+    },
+    "macro_groups": {
+      "Attention": 0.118,
+      "Auditory": 0.367,
+      "Emotion": 0.0,
+      "Language": 0.113,
+      "Motor": 0.357,
+      "Visual": 0.051
+    },
+    "overall": 0.168,
+    "total_timesteps": 6,
+    "agent_summary": "TRIBE v2 cortical trajectory: 6 timesteps (TR=1.49s), peak at t=1. Dominant macro groups at peak: Auditory (0.37), Motor (0.36), Attention (0.12). fMRI predictions averaged over Yeo 7-network parcellation; hemodynamic lag (~5s) already compensated by TRIBE.",
+    "source": "tribe-v2"
+  },
+  "calm_02": {
+    "stimulus_id": "calm_02",
+    "regions": {
+      "prefrontal_cortex": 0.159,
+      "amygdala_region": 0.0,
+      "temporal_lobe": 0.296,
+      "motor_cortex": 0.415,
+      "visual_cortex": 0.022
+    },
+    "macro_groups": {
+      "Attention": 0.179,
+      "Auditory": 0.454,
+      "Emotion": 0.0,
+      "Language": 0.138,
+      "Motor": 0.415,
+      "Visual": 0.022
+    },
+    "overall": 0.201,
+    "total_timesteps": 5,
+    "agent_summary": "TRIBE v2 cortical trajectory: 5 timesteps (TR=1.49s), peak at t=1. Dominant macro groups at peak: Auditory (0.45), Motor (0.41), Attention (0.18). fMRI predictions averaged over Yeo 7-network parcellation; hemodynamic lag (~5s) already compensated by TRIBE.",
+    "source": "tribe-v2"
+  },
+  "img_calm_01": {
+    "stimulus_id": "img_calm_01",
+    "regions": {
+      "prefrontal_cortex": 0.074,
+      "amygdala_region": 0.0,
+      "temporal_lobe": 0.242,
+      "motor_cortex": 0.41,
+      "visual_cortex": 0.0
+    },
+    "macro_groups": {
+      "Attention": 0.077,
+      "Auditory": 0.414,
+      "Emotion": 0.0,
+      "Language": 0.071,
+      "Motor": 0.41,
+      "Visual": 0.0
+    },
+    "overall": 0.162,
+    "total_timesteps": 5,
+    "agent_summary": "TRIBE v2 cortical trajectory: 5 timesteps (TR=1.49s), peak at t=0. Dominant macro groups at peak: Auditory (0.41), Motor (0.41), Attention (0.08). fMRI predictions averaged over Yeo 7-network parcellation; hemodynamic lag (~5s) already compensated by TRIBE.",
+    "source": "tribe-v2"
+  },
+  "calm_01": {
+    "stimulus_id": "calm_01",
+    "regions": {
+      "prefrontal_cortex": 0.106,
+      "amygdala_region": 0.0,
+      "temporal_lobe": 0.27,
+      "motor_cortex": 0.446,
+      "visual_cortex": 0.0
+    },
+    "macro_groups": {
+      "Attention": 0.083,
+      "Auditory": 0.413,
+      "Emotion": 0.0,
+      "Language": 0.128,
+      "Motor": 0.446,
+      "Visual": 0.0
+    },
+    "overall": 0.178,
+    "total_timesteps": 5,
+    "agent_summary": "TRIBE v2 cortical trajectory: 5 timesteps (TR=1.49s), peak at t=1. Dominant macro groups at peak: Motor (0.45), Auditory (0.41), Language (0.13). fMRI predictions averaged over Yeo 7-network parcellation; hemodynamic lag (~5s) already compensated by TRIBE.",
+    "source": "tribe-v2"
+  },
+  "img_activating_03": {
+    "stimulus_id": "img_activating_03",
+    "regions": {
+      "prefrontal_cortex": 0.088,
+      "amygdala_region": 0.0,
+      "temporal_lobe": 0.244,
+      "motor_cortex": 0.461,
+      "visual_cortex": 0.0
+    },
+    "macro_groups": {
+      "Attention": 0.091,
+      "Auditory": 0.402,
+      "Emotion": 0.0,
+      "Language": 0.085,
+      "Motor": 0.461,
+      "Visual": 0.0
+    },
+    "overall": 0.173,
+    "total_timesteps": 5,
+    "agent_summary": "TRIBE v2 cortical trajectory: 5 timesteps (TR=1.49s), peak at t=1. Dominant macro groups at peak: Motor (0.46), Auditory (0.40), Attention (0.09). fMRI predictions averaged over Yeo 7-network parcellation; hemodynamic lag (~5s) already compensated by TRIBE.",
+    "source": "tribe-v2"
+  }
+}

@@ -42,18 +42,20 @@ export function titleCase(s: string): string {
     .join(" ");
 }
 
-// Map a burnout level to its dashboard status copy.
+// Map a wellness level to its dashboard status copy.
+// Wellness is 0..100 where higher = better: green is thriving, yellow neutral,
+// red is running low.
 export function scoreLabel(
   level: string
-): "Systems Normal" | "Warning: Check In" | "Alert: Take Action" {
+): "Thriving" | "Keep an eye out" | "Running low" {
   switch (level) {
     case "green":
-      return "Systems Normal";
+      return "Thriving";
     case "yellow":
-      return "Warning: Check In";
+      return "Keep an eye out";
     case "red":
-      return "Alert: Take Action";
+      return "Running low";
     default:
-      return "Systems Normal";
+      return "Thriving";
   }
 }

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pegasus-face-emotion"
+version = "0.1.0"
+description = "Facial affect + multimodal emotion detection framework (built for Pegasus)"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Pegasus team — Rishith, Wesley, Dhruva, Jason" }]
+dependencies = [
+    "huggingface-hub>=0.27",
+]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.34", "python-multipart>=0.0.20", "pydantic>=2.10"]
+
+[tool.setuptools]
+packages = ["face_emotion"]

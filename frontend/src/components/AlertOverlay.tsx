@@ -153,7 +153,7 @@ export default function AlertOverlay({
         {/* Breathing red radial glow filling the screen. */}
         <Animated.View style={[StyleSheet.absoluteFill, glowStyle]}>
           <LinearGradient
-            colors={["rgba(239,68,68,0.55)", "rgba(239,68,68,0.0)"]}
+            colors={["rgba(255,59,48,0.32)", "rgba(255,59,48,0.0)"]}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10,10,10,0.82)",
+    backgroundColor: "rgba(245,245,247,0.92)",
   },
   content: {
     flexGrow: 1,
@@ -234,9 +234,9 @@ const styles = StyleSheet.create({
     height: 260,
     borderRadius: 130,
     top: -56,
-    backgroundColor: "rgba(239,68,68,0.12)",
+    backgroundColor: "rgba(255,59,48,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.35)",
+    borderColor: "rgba(255,59,48,0.30)",
   },
   alertPill: {
     flexDirection: "row",
@@ -245,8 +245,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.45)",
-    backgroundColor: "rgba(239,68,68,0.10)",
+    borderColor: "rgba(255,59,48,0.40)",
+    backgroundColor: "rgba(255,59,48,0.10)",
     marginBottom: SPACING.lg,
   },
   alertDot: {
@@ -302,10 +302,15 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.sm + 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   contactPressed: {
-    backgroundColor: "#181820",
-    borderColor: "rgba(239,68,68,0.4)",
+    backgroundColor: "#fff0ef",
+    borderColor: "rgba(255,59,48,0.40)",
   },
   contactBody: {
     flex: 1,
@@ -325,9 +330,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.pill,
-    backgroundColor: "rgba(239,68,68,0.14)",
+    backgroundColor: "rgba(255,59,48,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.4)",
+    borderColor: "rgba(255,59,48,0.40)",
   },
   contactActionText: {
     ...TYPE.label,
@@ -344,7 +349,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
   },
   dismissPressed: {
-    backgroundColor: "#181820",
+    backgroundColor: "#e8e8ed",
   },
   dismissText: {
     ...TYPE.body,

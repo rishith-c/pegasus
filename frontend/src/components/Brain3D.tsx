@@ -17,12 +17,12 @@ import { COLORS } from "../utils/colors";
 
 type Regions = BrainData["regions"];
 
-// activation 0..1 -> blue (#3b82f6) -> yellow (#eab308) -> red (#ef4444)
+// activation 0..1 -> blue (#0071e3) -> amber (#FF9F0A) -> red (#FF3B30)
 function activationColor(a: number): THREE.Color {
   const c = new THREE.Color();
   const t = Math.max(0, Math.min(1, a));
-  if (t < 0.5) c.lerpColors(new THREE.Color("#3b82f6"), new THREE.Color("#eab308"), t * 2);
-  else c.lerpColors(new THREE.Color("#eab308"), new THREE.Color("#ef4444"), (t - 0.5) * 2);
+  if (t < 0.5) c.lerpColors(new THREE.Color(COLORS.blue), new THREE.Color(COLORS.yellow), t * 2);
+  else c.lerpColors(new THREE.Color(COLORS.yellow), new THREE.Color(COLORS.red), (t - 0.5) * 2);
   return c;
 }
 
@@ -96,7 +96,7 @@ export default function Brain3D({ regions, size = 280 }: { regions?: Regions; si
         brain.scale.setScalar(1.6 / (sphere.radius || 1));
         brain.traverse((c: any) => {
           if (c.isMesh) {
-            c.material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.6, metalness: 0.1 });
+            c.material = new THREE.MeshStandardMaterial({ color: 0x0071e3, roughness: 0.6, metalness: 0.1 });
           }
         });
         root.add(brain);
@@ -147,7 +147,7 @@ function proceduralBrain(): THREE.Points {
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  return new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x3b82f6, size: 0.02 }));
+  return new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x0071e3, size: 0.025 }));
 }
 
 const styles = StyleSheet.create({
