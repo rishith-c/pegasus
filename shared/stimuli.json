@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "note": "Canonical app-facing stimulus manifest (contract v2 shape). Served by the backend /stimulus endpoints. SMS stimuli live separately in signals/stimuli/bank.py (owned by Dhruva).",
+  "stimuli": [
+    { "id": "calm_01", "type": "image", "url": "https://picsum.photos/seed/pegasus-calm-1/800/600", "category": "calm", "prompt": "Take a slow look at this image. How does it make you feel right now?" },
+    { "id": "calm_02", "type": "image", "url": "https://picsum.photos/seed/pegasus-calm-2/800/600", "category": "calm", "prompt": "Rest your eyes on this for a moment. What comes up for you?" },
+    { "id": "audio_01", "type": "audio", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", "category": "calm", "prompt": "Listen for a few seconds. Notice what shifts in you, then describe it." },
+    { "id": "question_01", "type": "text", "url": "", "category": "neutral", "prompt": "What's one thing on your mind right now?" },
+    { "id": "question_02", "type": "text", "url": "", "category": "neutral", "prompt": "How would you describe your energy today, in a sentence?" },
+    { "id": "activating_01", "type": "text", "url": "", "category": "activating", "prompt": "Your deadline just moved up by a week. React honestly — what's your first thought?" }
+  ]
+}
