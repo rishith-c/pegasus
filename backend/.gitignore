@@ -1,7 +1,9 @@
-# SQLite database files (created at runtime)
+# SQLite database files (created at runtime; -wal/-shm are WAL sidecars)
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
-pegasus.db
+pegasus.db*
 
 # Local virtualenv
 .venv/

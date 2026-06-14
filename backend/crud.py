@@ -1,4 +1,5 @@
 """Thin persistence helpers over the SQLAlchemy models."""
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.score_record import ScoreRecord
@@ -13,10 +14,16 @@ def get_user(db: Session, user_id: str) -> User | None:
 
 def ensure_user(db: Session, user_id: str, name=None, phone=None) -> User:
     user = db.get(User, user_id)
-    if user is None:
-        user = User(id=user_id, name=name, phone=phone)
-        db.add(user)
+    if user is not None:
+        return user
+    user = User(id=user_id, name=name, phone=phone)
+    db.add(user)
+    try:
         db.commit()
+    except IntegrityError:
+        # Concurrent request created the same user first: roll back and reuse it.
+        db.rollback()
+        user = db.get(User, user_id)
     return user
 
 
