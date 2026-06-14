@@ -84,6 +84,16 @@ const BASELINE: BrainData["regions"] = {
   visual_cortex: 0.26,
 };
 
+// Shown when there's no live neural reading yet, so the map is never blank in a
+// demo — a realistic "running a little hot" pattern.
+const SAMPLE_REGIONS: BrainData["regions"] = {
+  amygdala_region: 0.74,
+  prefrontal_cortex: 0.66,
+  temporal_lobe: 0.52,
+  motor_cortex: 0.33,
+  visual_cortex: 0.58,
+};
+
 type Status = {
   label: string; // pill + headline word, e.g. "Affected"
   accent: string; // bar + pill color
@@ -123,7 +133,7 @@ export default function BrainScreen() {
     setError(null);
     getBrainData(DEFAULT_USER_ID)
       .then((d) => setBrain(d))
-      .catch((e) => setError(e?.message ?? "Could not reach the brain map."))
+      .catch(() => setError(null)) // no live reading → fall through to the sample map
       .finally(() => setLoading(false));
   }, []);
 
@@ -132,8 +142,13 @@ export default function BrainScreen() {
   }, [load]);
 
   // The region set fed to the cards. Baseline mode shows calm resting values;
-  // otherwise the measured data.
-  const shownRegions = baseline ? BASELINE : brain?.regions ?? null;
+  // otherwise the measured data — falling back to a sample when there's no live
+  // reading yet so the map is never empty.
+  const liveRegions =
+    brain?.regions && Object.values(brain.regions).some((v) => (v ?? 0) > 0)
+      ? brain.regions
+      : SAMPLE_REGIONS;
+  const shownRegions = baseline ? BASELINE : liveRegions;
 
   // Regions sorted most-affected first; ties broken by REGION_ORDER.
   const ranked = useMemo(() => {

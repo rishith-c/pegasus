@@ -65,6 +65,37 @@ const EMPTY_BREAKDOWN: Breakdown = {
   tribe: 0,
 };
 
+// Demo sample, shown when there's no real data yet so Metrics is never blank.
+const SAMPLE_BREAKDOWN: Breakdown = { imessage: 58, typing: 46, facial: 52, voice: 38, tribe: 30 };
+const _SAMPLE_SCORES = [52, 61, 49, 70, 66, 74, 81];
+const _lvl = (s: number) => (s >= 70 ? "green" : s >= 40 ? "yellow" : "red");
+
+function sampleMetrics(): MetricsPayload {
+  const now = Date.now();
+  return {
+    total_checkins: _SAMPLE_SCORES.length,
+    latest_breakdown: SAMPLE_BREAKDOWN,
+    score_trend: _SAMPLE_SCORES.map((score, i) => ({
+      date: new Date(now - (_SAMPLE_SCORES.length - 1 - i) * 86400000).toISOString(),
+      score,
+      level: _lvl(score),
+    })),
+  };
+}
+
+function sampleHistory(): RichHistory[] {
+  const now = Date.now();
+  return _SAMPLE_SCORES.map((score, i) => ({
+    score,
+    level: _lvl(score),
+    timestamp: new Date(now - (_SAMPLE_SCORES.length - 1 - i) * 86400000).toISOString(),
+    typing_wpm: 42 + score / 3,
+    error_rate: Math.max(1, 14 - score / 8),
+    sentiment_score: Math.min(0.9, 0.2 + score / 130),
+    breakdown: SAMPLE_BREAKDOWN,
+  } as unknown as RichHistory));
+}
+
 // A history row may carry richer fields than the BurnoutResult contract when it
 // originated from the /analyze flow. Read them opportunistically.
 type RichHistory = BurnoutResult & {
@@ -121,10 +152,13 @@ export default function MetricsScreen() {
         getMetrics(DEFAULT_USER_ID) as Promise<MetricsPayload>,
         getHistory(DEFAULT_USER_ID) as unknown as Promise<RichHistory[]>,
       ]);
-      setMetrics(m ?? {});
-      setHistory(Array.isArray(h) ? h : []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load metrics.");
+      const hasMetrics = m && (m.score_trend?.length || m.latest_breakdown);
+      setMetrics(hasMetrics ? m : sampleMetrics());
+      setHistory(Array.isArray(h) && h.length ? h : sampleHistory());
+    } catch {
+      // No data yet → show the demo sample rather than an error screen.
+      setMetrics(sampleMetrics());
+      setHistory(sampleHistory());
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -161,7 +195,7 @@ export default function MetricsScreen() {
     num(metrics?.total_checkins) ?? history.length;
 
   const breakdown: Breakdown = useMemo(() => {
-    const src = metrics?.latest_breakdown ?? latest?.breakdown ?? {};
+    const src = metrics?.latest_breakdown ?? latest?.breakdown ?? SAMPLE_BREAKDOWN;
     return { ...EMPTY_BREAKDOWN, ...src };
   }, [metrics, latest]);
 
