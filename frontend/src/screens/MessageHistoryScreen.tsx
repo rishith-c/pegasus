@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import AmbientGlow from '../components/AmbientGlow';
+import GlassCard from '../components/GlassCard';
 import { ColorTheme, Level, levelColor } from '../utils/colors';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -44,10 +47,12 @@ function sentimentLabel(level: Level) {
 export default function MessageHistoryScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
+  const tabBarHeight = useBottomTabBarHeight();
   const last = MESSAGES[MESSAGES.length - 1];
 
   return (
     <View style={styles.container}>
+      <AmbientGlow />
       <View style={styles.header}>
         <Text style={styles.title}>Message History</Text>
         <View style={styles.readOnlyBadge}>
@@ -86,7 +91,7 @@ export default function MessageHistoryScreen() {
       <FlatList
         data={MESSAGES}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + 24 }]}
         renderItem={({ item, index }) => {
           const showDate = index === 0 || MESSAGES[index - 1].date !== item.date;
           const isLastInGroup = index === MESSAGES.length - 1 || MESSAGES[index + 1].from !== item.from;
@@ -95,9 +100,15 @@ export default function MessageHistoryScreen() {
             <View>
               {showDate && <Text style={styles.dateDivider}>{item.date}</Text>}
               <View style={[styles.bubbleRow, isUser ? styles.bubbleRowUser : styles.bubbleRowAi]}>
-                <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAi]}>
-                  <Text style={isUser ? styles.bubbleTextUser : styles.bubbleTextAi}>{item.text}</Text>
-                </View>
+                {isUser ? (
+                  <View style={[styles.bubble, styles.bubbleUser]}>
+                    <Text style={styles.bubbleTextUser}>{item.text}</Text>
+                  </View>
+                ) : (
+                  <GlassCard style={[styles.bubble, styles.bubbleAi]} intensity={30}>
+                    <Text style={styles.bubbleTextAi}>{item.text}</Text>
+                  </GlassCard>
+                )}
               </View>
               {isLastInGroup && (
                 <Text style={[styles.bubbleTime, isUser ? styles.bubbleTimeUser : styles.bubbleTimeAi]}>{item.time}</Text>
@@ -155,7 +166,7 @@ function createStyles(colors: ColorTheme) {
       paddingHorizontal: 14,
     },
     bubbleUser: { backgroundColor: colors.blue, borderBottomRightRadius: 4 },
-    bubbleAi: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderBottomLeftRadius: 4 },
+    bubbleAi: { borderBottomLeftRadius: 4 },
     bubbleTextUser: { color: '#05050a', fontSize: 15, lineHeight: 20 },
     bubbleTextAi: { color: colors.text, fontSize: 15, lineHeight: 20 },
     bubbleTime: { fontSize: 11, color: colors.textDim, marginTop: 4, marginBottom: 8 },

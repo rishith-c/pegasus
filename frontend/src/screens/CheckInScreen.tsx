@@ -16,6 +16,8 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import PulseRing from '../components/PulseRing';
 import CheckEngine from '../components/CheckEngine';
 import ScoreBreakdown from '../components/ScoreBreakdown';
+import AmbientGlow from '../components/AmbientGlow';
+import GlassCard from '../components/GlassCard';
 import { COLORS, ColorTheme, Level } from '../utils/colors';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -188,25 +190,26 @@ export default function CheckInScreen() {
   if (stage === 'result') {
     return (
       <Animated.View key="result" style={styles.container} entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
+        <AmbientGlow />
         <View style={styles.content}>
           <Text style={styles.title}>Check-In Results</Text>
 
-          <View style={styles.resultCard}>
+          <GlassCard style={styles.resultCard} intensity={30}>
             <Text style={styles.resultLabel}>Facial Stress</Text>
             <Text style={[styles.resultScore, { color: levelTint(PLACEHOLDER_RESULT.level) }]}>
               {PLACEHOLDER_RESULT.facialStress}
             </Text>
             <ScoreBreakdown items={PLACEHOLDER_RESULT.breakdown} />
-          </View>
+          </GlassCard>
 
-          <View style={styles.resultCard}>
+          <GlassCard style={styles.resultCard} intensity={30}>
             <Text style={styles.resultLabel}>Voice</Text>
             <Text style={styles.voiceRow}>Pitch: {PLACEHOLDER_RESULT.voice.pitch}</Text>
             <Text style={styles.voiceRow}>Speaking rate: {PLACEHOLDER_RESULT.voice.rate}</Text>
             <Text style={styles.voiceRow}>
               Tremor detected: {PLACEHOLDER_RESULT.voice.tremor ? 'Yes' : 'No'}
             </Text>
-          </View>
+          </GlassCard>
 
           <Text style={styles.updatedLabel}>This updated your Pegasus score to</Text>
           <CheckEngine score={PLACEHOLDER_RESULT.newScore} level={PLACEHOLDER_RESULT.newLevel} size={160} />
@@ -222,6 +225,7 @@ export default function CheckInScreen() {
   if (stage === 'analyzing') {
     return (
       <Animated.View key="analyzing" style={styles.container} entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
+        <AmbientGlow />
         <View style={styles.centerContent}>
           <PulseRing duration={1600} scaleTo={1.12}>
             <MaterialCommunityIcons name="brain" size={64} color={colors.blue} />
@@ -236,6 +240,7 @@ export default function CheckInScreen() {
 
   return (
     <Animated.View key="main" style={styles.container} entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
+      <AmbientGlow />
       <View style={styles.centerContent}>
         <Text style={styles.title}>Video Check-In</Text>
         <View style={styles.cameraPreview}>
@@ -291,8 +296,8 @@ function createStyles(colors: ColorTheme, isDark: boolean) {
       borderRadius: 24,
       overflow: 'hidden',
       backgroundColor: colors.card,
-      borderColor: colors.border,
-      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.6)',
+      borderWidth: 1.5,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -347,9 +352,6 @@ function createStyles(colors: ColorTheme, isDark: boolean) {
     analyzingText: { color: colors.textDim, fontSize: 15 },
     resultCard: {
       width: '100%',
-      backgroundColor: colors.card,
-      borderColor: colors.border,
-      borderWidth: 1,
       borderRadius: 16,
       padding: 16,
       gap: 8,
