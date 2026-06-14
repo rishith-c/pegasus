@@ -1,14 +1,32 @@
-export const COLORS = {
-  bg: '#0a0a0a',
-  card: '#1a1a2e',
-  border: '#2a2a3e',
-  text: '#ffffff',
-  textDim: '#9ca3af',
-  green: '#22c55e',
-  yellow: '#eab308',
-  red: '#ef4444',
-  blue: '#3b82f6',
+export const darkColors = {
+  bg: '#10151c',
+  card: '#1b2330',
+  border: '#2b3441',
+  text: '#eef1f5',
+  textDim: '#8b96a8',
+  green: '#7fc8a8',
+  yellow: '#e3b873',
+  red: '#dd9088',
+  blue: '#85aed1',
 } as const;
+
+export const lightColors = {
+  bg: '#f4f6f9',
+  card: '#ffffff',
+  border: '#dde3ea',
+  text: '#1c2733',
+  textDim: '#6b7888',
+  green: darkColors.green,
+  yellow: darkColors.yellow,
+  red: darkColors.red,
+  blue: darkColors.blue,
+} as const;
+
+export type ColorTheme = typeof darkColors;
+
+// Fixed dark palette, for elements (alert overlay, gauge core) that stay
+// dark regardless of the active theme.
+export const COLORS = darkColors;
 
 export type Level = 'green' | 'yellow' | 'red';
 
@@ -17,7 +35,15 @@ export const levelColor = (level: Level | string): string =>
 
 export const levelLabel = (level: Level | string): string =>
   level === 'green'
-    ? 'Systems Normal'
+    ? 'All systems normal'
     : level === 'yellow'
-    ? 'Warning: Check In'
-    : 'Alert: Take Action';
+    ? 'Check-in recommended'
+    : 'Action recommended';
+
+export function hexToRgba(hex: string, alpha: number): string {
+  const value = hex.replace('#', '');
+  const r = parseInt(value.substring(0, 2), 16);
+  const g = parseInt(value.substring(2, 4), 16);
+  const b = parseInt(value.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}

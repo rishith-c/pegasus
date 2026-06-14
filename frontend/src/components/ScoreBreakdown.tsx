@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../utils/colors';
+import { COLORS, ColorTheme } from '../utils/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface BreakdownItem {
   label: string;
@@ -18,6 +19,8 @@ function barColor(value: number) {
 }
 
 export default function ScoreBreakdown({ items }: ScoreBreakdownProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   return (
     <View style={styles.container}>
       {items.map((item) => (
@@ -38,18 +41,20 @@ export default function ScoreBreakdown({ items }: ScoreBreakdownProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: 12 },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  label: { color: COLORS.textDim, fontSize: 13, width: 70 },
-  track: {
-    flex: 1,
-    height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginHorizontal: 10,
-  },
-  fill: { height: '100%', borderRadius: 4 },
-  value: { color: COLORS.text, fontSize: 13, width: 40, textAlign: 'right' },
-});
+function createStyles(colors: ColorTheme) {
+  return StyleSheet.create({
+    container: { gap: 12 },
+    row: { flexDirection: 'row', alignItems: 'center' },
+    label: { color: colors.textDim, fontSize: 13, width: 70 },
+    track: {
+      flex: 1,
+      height: 8,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginHorizontal: 10,
+    },
+    fill: { height: '100%', borderRadius: 4 },
+    value: { color: colors.text, fontSize: 13, width: 40, textAlign: 'right' },
+  });
+}

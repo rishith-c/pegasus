@@ -1,11 +1,24 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { useRoute, useFocusEffect } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSequence,
+  interpolate,
+  Easing,
+  FadeIn,
+  FadeOut,
+} from 'react-native-reanimated';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import PulseRing from '../components/PulseRing';
 import CheckEngine from '../components/CheckEngine';
 import ScoreBreakdown from '../components/ScoreBreakdown';
-import { COLORS, Level } from '../utils/colors';
+import { COLORS, ColorTheme, Level } from '../utils/colors';
+import { useTheme } from '../theme/ThemeContext';
 
-// TODO: wire up `useCamera()` for permissions + preview + startRecording/stopRecording
 // TODO: replace with `await submitVideo(userId, videoUri)` result
 const PLACEHOLDER_RESULT: {
   facialStress: number;
@@ -38,21 +51,71 @@ const CHECK_IN_SECONDS = 60;
 type Stage = 'idle' | 'recording' | 'analyzing' | 'result';
 
 export default function CheckInScreen() {
+  const route = useRoute<any>();
+  const { colors, isDark } = useTheme();
+  const styles = createStyles(colors, isDark);
   const [stage, setStage] = useState<Stage>('idle');
   const [secondsLeft, setSecondsLeft] = useState(CHECK_IN_SECONDS);
   const [promptIndex, setPromptIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const shutterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const analyzeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAutoStartRef = useRef<number | undefined>(undefined);
+  const stageRef = useRef(stage);
+  const cameraRef = useRef<CameraView>(null);
+  const videoUriRef = useRef<string | null>(null);
+  const permissionRequestedRef = useRef(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
+  const hasPermissions = !!cameraPermission?.granted && !!microphonePermission?.granted;
+  const shutterScale = useSharedValue(1);
+  const recording = useSharedValue(0);
+  const shutterStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: shutterScale.value }],
+    width: interpolate(recording.value, [0, 1], [56, 28]),
+    height: interpolate(recording.value, [0, 1], [56, 28]),
+    borderRadius: interpolate(recording.value, [0, 1], [28, 8]),
+  }));
+
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
+
+  useEffect(() => {
+    if (permissionRequestedRef.current) return;
+    if (!cameraPermission || !microphonePermission) return;
+    permissionRequestedRef.current = true;
+    if (!cameraPermission.granted) requestCameraPermission();
+    if (!microphonePermission.granted) requestMicrophonePermission();
+  }, [cameraPermission, microphonePermission, requestCameraPermission, requestMicrophonePermission]);
+
+  const requestPermissions = () => {
+    permissionRequestedRef.current = true;
+    requestCameraPermission();
+    requestMicrophonePermission();
+  };
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (shutterTimeoutRef.current) clearTimeout(shutterTimeoutRef.current);
+      if (analyzeTimeoutRef.current) clearTimeout(analyzeTimeoutRef.current);
     };
   }, []);
 
   const startRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (shutterTimeoutRef.current) clearTimeout(shutterTimeoutRef.current);
+    if (analyzeTimeoutRef.current) clearTimeout(analyzeTimeoutRef.current);
     setSecondsLeft(CHECK_IN_SECONDS);
     setStage('recording');
-    // TODO: await camera.startRecording(CHECK_IN_SECONDS)
+    recording.value = withTiming(1, { duration: 200 });
+    cameraRef.current
+      ?.recordAsync({ maxDuration: CHECK_IN_SECONDS })
+      .then((video) => {
+        videoUriRef.current = video?.uri ?? null;
+      })
+      .catch(() => {});
     timerRef.current = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -66,20 +129,65 @@ export default function CheckInScreen() {
   };
 
   const finishRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    recording.value = withTiming(0, { duration: 200 });
     setStage('analyzing');
-    // TODO: const videoUri = await camera.stopRecording()
-    // TODO: const result = await submitVideo(userId, videoUri)
-    setTimeout(() => setStage('result'), 1800);
+    cameraRef.current?.stopRecording();
+    // TODO: const result = await submitVideo(userId, videoUriRef.current)
+    analyzeTimeoutRef.current = setTimeout(() => setStage('result'), 1800);
   };
+
+  const cancelRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (shutterTimeoutRef.current) clearTimeout(shutterTimeoutRef.current);
+    if (analyzeTimeoutRef.current) clearTimeout(analyzeTimeoutRef.current);
+    cameraRef.current?.stopRecording();
+    recording.value = 0;
+    setSecondsLeft(CHECK_IN_SECONDS);
+    setStage('idle');
+    // discard the temp video file from this cancelled take
+    videoUriRef.current = null;
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (stageRef.current !== 'idle') {
+          cancelRecording();
+        }
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    const token = route.params?.autoStart;
+    if (token && token !== lastAutoStartRef.current) {
+      lastAutoStartRef.current = token;
+      startRecording();
+    }
+  }, [route.params?.autoStart]);
 
   const reset = () => {
     setPromptIndex((i) => (i + 1) % PROMPTS.length);
     setStage('idle');
   };
 
+  const pressShutter = () => {
+    if (!hasPermissions) {
+      requestPermissions();
+      return;
+    }
+    const wasRecording = stage === 'recording';
+    shutterScale.value = withSequence(
+      withTiming(0.85, { duration: 90, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: 140, easing: Easing.out(Easing.quad) })
+    );
+    shutterTimeoutRef.current = setTimeout(wasRecording ? finishRecording : startRecording, 160);
+  };
+
   if (stage === 'result') {
     return (
-      <View style={styles.container}>
+      <Animated.View key="result" style={styles.container} entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
         <View style={styles.content}>
           <Text style={styles.title}>Check-In Results</Text>
 
@@ -107,57 +215,63 @@ export default function CheckInScreen() {
             <Text style={styles.buttonText}>Done</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
   if (stage === 'analyzing') {
     return (
-      <View style={styles.container}>
+      <Animated.View key="analyzing" style={styles.container} entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
         <View style={styles.centerContent}>
-          <PulseRing duration={900} scaleTo={1.2}>
-            <Text style={styles.brainEmoji}>🧠</Text>
+          <PulseRing duration={1600} scaleTo={1.12}>
+            <MaterialCommunityIcons name="brain" size={64} color={colors.blue} />
           </PulseRing>
           <Text style={styles.analyzingText}>Analyzing your check-in...</Text>
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
-  if (stage === 'recording') {
-    return (
-      <View style={styles.container}>
-        <View style={styles.centerContent}>
-          <View style={styles.cameraPreview}>
-            <View style={styles.faceOval} />
-          </View>
-          <View style={styles.recordingRow}>
-            <PulseRing duration={500} scaleTo={1.4}>
-              <View style={styles.recDot} />
-            </PulseRing>
-            <Text style={styles.countdown}>{secondsLeft}s</Text>
-          </View>
-          <Text style={styles.prompt}>{PROMPTS[promptIndex]}</Text>
-        </View>
-      </View>
-    );
-  }
+  const recordingNow = stage === 'recording';
 
   return (
-    <View style={styles.container}>
+    <Animated.View key="main" style={styles.container} entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
       <View style={styles.centerContent}>
         <Text style={styles.title}>Video Check-In</Text>
         <View style={styles.cameraPreview}>
-          <View style={styles.faceOval} />
-          <Text style={styles.previewHint}>Camera preview</Text>
+          {hasPermissions ? (
+            <>
+              <CameraView ref={cameraRef} style={styles.cameraView} facing="front" mode="video" />
+              <View style={styles.faceOval} />
+            </>
+          ) : (
+            <View style={styles.permissionPrompt}>
+              <MaterialCommunityIcons name="camera-off-outline" size={36} color={colors.textDim} />
+              <Text style={styles.permissionText}>
+                Camera & microphone access is needed for video check-ins
+              </Text>
+              <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
+                <Text style={styles.permissionButtonText}>Allow Access</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
         <Text style={styles.prompt}>{PROMPTS[promptIndex]}</Text>
-        <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
-          <View style={styles.recordButtonInner} />
-        </TouchableOpacity>
-        <Text style={styles.hint}>Tap to start a 60-second check-in</Text>
+        <View style={styles.shutterWrapper}>
+          {recordingNow && (
+            <PulseRing duration={1400} scaleTo={1.15} style={styles.recordingRing}>
+              <View style={styles.recordingRingInner} />
+            </PulseRing>
+          )}
+          <Pressable style={styles.recordButton} onPress={pressShutter}>
+            <Animated.View style={[styles.recordButtonInner, shutterStyle]} />
+          </Pressable>
+        </View>
+        <Text style={styles.hint}>
+          {recordingNow ? `Recording... ${secondsLeft}s left, tap to finish` : 'Tap to start a 60-second check-in'}
+        </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -165,74 +279,100 @@ function levelTint(level: Level) {
   return level === 'green' ? COLORS.green : level === 'yellow' ? COLORS.yellow : COLORS.red;
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  content: { padding: 24, paddingTop: 60, alignItems: 'center', gap: 16 },
-  centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 20 },
-  title: { color: COLORS.text, fontSize: 24, fontWeight: '800' },
-  cameraPreview: {
-    width: 220,
-    height: 280,
-    borderRadius: 24,
-    backgroundColor: COLORS.card,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  faceOval: {
-    width: 140,
-    height: 180,
-    borderRadius: 90,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    borderStyle: 'dashed',
-  },
-  previewHint: { color: COLORS.textDim, fontSize: 12, marginTop: 12, position: 'absolute', bottom: 16 },
-  prompt: { color: COLORS.text, fontSize: 18, textAlign: 'center', lineHeight: 26 },
-  recordButton: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 4,
-    borderColor: COLORS.text,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recordButtonInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.red },
-  hint: { color: COLORS.textDim, fontSize: 13 },
-  recordingRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  recDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: COLORS.red },
-  countdown: { color: COLORS.text, fontSize: 24, fontWeight: '800' },
-  brainEmoji: { fontSize: 64 },
-  analyzingText: { color: COLORS.textDim, fontSize: 15 },
-  resultCard: {
-    width: '100%',
-    backgroundColor: COLORS.card,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-  },
-  resultLabel: {
-    color: COLORS.textDim,
-    fontSize: 12,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  resultScore: { fontSize: 36, fontWeight: '800', marginBottom: 8 },
-  voiceRow: { color: COLORS.text, fontSize: 14 },
-  updatedLabel: { color: COLORS.textDim, fontSize: 13, marginTop: 8 },
-  button: {
-    marginTop: 8,
-    backgroundColor: COLORS.green,
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    width: '100%',
-    alignItems: 'center',
-  },
-  buttonText: { color: '#05050a', fontSize: 16, fontWeight: '800' },
-});
+function createStyles(colors: ColorTheme, isDark: boolean) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    content: { padding: 24, paddingTop: 60, alignItems: 'center', gap: 16 },
+    centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 20 },
+    title: { color: colors.text, fontSize: 24, fontWeight: '800' },
+    cameraPreview: {
+      width: 220,
+      height: 280,
+      borderRadius: 24,
+      overflow: 'hidden',
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cameraView: { ...StyleSheet.absoluteFillObject },
+    faceOval: {
+      width: 140,
+      height: 180,
+      borderRadius: 90,
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+    },
+    permissionPrompt: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+      gap: 14,
+    },
+    permissionText: {
+      color: colors.textDim,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    permissionButton: {
+      backgroundColor: colors.green,
+      borderRadius: 999,
+      paddingVertical: 10,
+      paddingHorizontal: 24,
+    },
+    permissionButtonText: { color: '#05050a', fontSize: 13, fontWeight: '800' },
+    prompt: { color: colors.text, fontSize: 18, textAlign: 'center', lineHeight: 26 },
+    shutterWrapper: { width: 76, height: 76, alignItems: 'center', justifyContent: 'center' },
+    recordButton: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      borderWidth: 4,
+      borderColor: colors.text,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    recordButtonInner: { backgroundColor: colors.red },
+    recordingRing: { position: 'absolute', width: 96, height: 96, top: -10, left: -10 },
+    recordingRingInner: {
+      flex: 1,
+      borderRadius: 48,
+      borderWidth: isDark ? 2 : 3,
+      borderColor: isDark ? colors.red : '#c0392b',
+    },
+    hint: { color: colors.textDim, fontSize: 13 },
+    analyzingText: { color: colors.textDim, fontSize: 15 },
+    resultCard: {
+      width: '100%',
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 16,
+      padding: 16,
+      gap: 8,
+    },
+    resultLabel: {
+      color: colors.textDim,
+      fontSize: 12,
+      letterSpacing: 2,
+      textTransform: 'uppercase',
+      marginBottom: 4,
+    },
+    resultScore: { fontSize: 36, fontWeight: '800', marginBottom: 8 },
+    voiceRow: { color: colors.text, fontSize: 14 },
+    updatedLabel: { color: colors.textDim, fontSize: 13, marginTop: 8 },
+    button: {
+      marginTop: 8,
+      backgroundColor: colors.green,
+      borderRadius: 999,
+      paddingVertical: 16,
+      paddingHorizontal: 48,
+      width: '100%',
+      alignItems: 'center',
+    },
+    buttonText: { color: '#05050a', fontSize: 16, fontWeight: '800' },
+  });
+}

@@ -20,6 +20,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Pegasus uses your camera for video check-ins.",
+          "microphonePermission": "Pegasus uses your microphone to capture voice during check-ins.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ]
   }
 }

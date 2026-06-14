@@ -1,40 +1,43 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../utils/colors';
+import { Text, StyleSheet } from 'react-native';
+import { ColorTheme } from '../utils/colors';
+import { useTheme } from '../theme/ThemeContext';
+import GlassCard from './GlassCard';
 
 interface InterventionCardProps {
   text: string;
 }
 
 export default function InterventionCard({ text }: InterventionCardProps) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   return (
-    <View style={styles.card}>
+    <GlassCard style={styles.card} intensity={30}>
       <Text style={styles.label}>SUGGESTION</Text>
       <Text style={styles.text}>{text}</Text>
-    </View>
+    </GlassCard>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    width: '100%',
-    backgroundColor: COLORS.card,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 16,
-  },
-  label: {
-    color: COLORS.textDim,
-    fontSize: 11,
-    letterSpacing: 2,
-    marginBottom: 6,
-    fontWeight: '700',
-  },
-  text: {
-    color: COLORS.text,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-});
+function createStyles(colors: ColorTheme) {
+  return StyleSheet.create({
+    card: {
+      width: '100%',
+      borderRadius: 16,
+      padding: 16,
+      marginTop: 16,
+    },
+    label: {
+      color: colors.textDim,
+      fontSize: 11,
+      letterSpacing: 2,
+      marginBottom: 6,
+      fontWeight: '700',
+    },
+    text: {
+      color: colors.text,
+      fontSize: 16,
+      lineHeight: 22,
+    },
+  });
+}

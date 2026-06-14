@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { COLORS, levelColor, Level } from '../utils/colors';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import AmbientGlow from '../components/AmbientGlow';
+import GlassCard from '../components/GlassCard';
+import { COLORS, ColorTheme, levelColor, Level } from '../utils/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { formatDate } from '../utils/formatting';
 
 interface HistoryEntry {
@@ -22,14 +26,17 @@ const PLACEHOLDER_HISTORY: HistoryEntry[] = [
   { id: '1', timestamp: '2026-06-08T09:00:00Z', score: 22, level: 'green', stimulusType: 'text', topIndicator: 'positive sentiment' },
 ];
 
-const FILTERS: { label: string; value: Level | 'all' }[] = [
+const FILTERS: { label: string; value: Level | 'all'; dot?: string }[] = [
   { label: 'All', value: 'all' },
-  { label: '🟢', value: 'green' },
-  { label: '🟡', value: 'yellow' },
-  { label: '🔴', value: 'red' },
+  { label: 'Calm', value: 'green', dot: COLORS.green },
+  { label: 'Warning', value: 'yellow', dot: COLORS.yellow },
+  { label: 'Alert', value: 'red', dot: COLORS.red },
 ];
 
 export default function HistoryScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+  const tabBarHeight = useBottomTabBarHeight();
   const [filter, setFilter] = useState<Level | 'all'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -37,6 +44,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
+      <AmbientGlow />
       <Text style={styles.title}>History</Text>
       <View style={styles.filters}>
         {FILTERS.map((f) => (
@@ -45,6 +53,7 @@ export default function HistoryScreen() {
             style={[styles.filterChip, filter === f.value && styles.filterChipActive]}
             onPress={() => setFilter(f.value)}
           >
+            {f.dot && <View style={[styles.filterDot, { backgroundColor: f.dot }]} />}
             <Text style={styles.filterText}>{f.label}</Text>
           </TouchableOpacity>
         ))}
@@ -52,54 +61,61 @@ export default function HistoryScreen() {
       <FlatList
         data={data}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + 40 }]}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => setExpandedId(expandedId === item.id ? null : item.id)}
-          >
-            <View style={[styles.scoreDot, { backgroundColor: levelColor(item.level) }]}>
-              <Text style={styles.scoreDotText}>{item.score}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.date}>{formatDate(item.timestamp)}</Text>
-              <Text style={styles.indicator}>{item.topIndicator}</Text>
-              {expandedId === item.id && <Text style={styles.detail}>Stimulus: {item.stimulusType}</Text>}
-            </View>
-          </TouchableOpacity>
+          <GlassCard style={styles.row} intensity={30}>
+            <TouchableOpacity
+              style={styles.rowInner}
+              onPress={() => setExpandedId(expandedId === item.id ? null : item.id)}
+            >
+              <View style={[styles.scoreDot, { backgroundColor: levelColor(item.level) }]}>
+                <Text style={styles.scoreDotText}>{item.score}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.date}>{formatDate(item.timestamp)}</Text>
+                <Text style={styles.indicator}>{item.topIndicator}</Text>
+                {expandedId === item.id && <Text style={styles.detail}>Stimulus: {item.stimulusType}</Text>}
+              </View>
+            </TouchableOpacity>
+          </GlassCard>
         )}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, paddingTop: 60 },
-  title: { color: COLORS.text, fontSize: 28, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16 },
-  filters: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 16, gap: 8 },
-  filterChip: {
-    backgroundColor: COLORS.card,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  filterChipActive: { borderColor: COLORS.text },
-  filterText: { color: COLORS.text, fontSize: 14 },
-  list: { paddingHorizontal: 24, paddingBottom: 60, gap: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-  },
-  scoreDot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  scoreDotText: { color: '#05050a', fontWeight: '800', fontSize: 14 },
-  date: { color: COLORS.text, fontSize: 15, fontWeight: '700' },
-  indicator: { color: COLORS.textDim, fontSize: 13, marginTop: 2 },
-  detail: { color: COLORS.textDim, fontSize: 12, marginTop: 6 },
-});
+function createStyles(colors: ColorTheme) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg, paddingTop: 60 },
+    title: { color: colors.text, fontSize: 28, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16 },
+    filters: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 16, gap: 8 },
+    filterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      gap: 6,
+    },
+    filterChipActive: { borderColor: colors.textDim },
+    filterDot: { width: 8, height: 8, borderRadius: 4 },
+    filterText: { color: colors.text, fontSize: 14 },
+    list: { paddingHorizontal: 24, paddingBottom: 60, gap: 10 },
+    row: {
+      borderRadius: 12,
+    },
+    rowInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+    },
+    scoreDot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+    scoreDotText: { color: '#05050a', fontWeight: '800', fontSize: 14 },
+    date: { color: colors.text, fontSize: 15, fontWeight: '700' },
+    indicator: { color: colors.textDim, fontSize: 13, marginTop: 2 },
+    detail: { color: colors.textDim, fontSize: 12, marginTop: 6 },
+  });
+}

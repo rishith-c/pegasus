@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../utils/colors';
 
 interface AlertOverlayProps {
@@ -13,8 +14,8 @@ export default function AlertOverlay({ visible, message, onClose }: AlertOverlay
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.content}>
-          <Text style={styles.icon}>⚠</Text>
-          <Text style={styles.title}>Check Engine Light: RED</Text>
+          <MaterialCommunityIcons name="alert-circle-outline" size={56} color={COLORS.red} style={styles.icon} />
+          <Text style={styles.title}>Check engine light: on</Text>
           <Text style={styles.message}>{message}</Text>
           <TouchableOpacity style={styles.button} onPress={onClose}>
             <Text style={styles.buttonText}>I see this</Text>
@@ -28,13 +29,13 @@ export default function AlertOverlay({ visible, message, onClose }: AlertOverlay
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(127, 29, 29, 0.95)',
+    backgroundColor: 'rgba(40, 26, 24, 0.97)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
   },
   content: { alignItems: 'center' },
-  icon: { fontSize: 64, marginBottom: 16 },
+  icon: { marginBottom: 16 },
   title: { color: COLORS.text, fontSize: 24, fontWeight: '800', marginBottom: 12 },
   message: { color: COLORS.text, fontSize: 16, textAlign: 'center', marginBottom: 24 },
   button: {

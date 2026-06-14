@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import CheckEngine from '../components/CheckEngine';
 import IndicatorCard from '../components/IndicatorCard';
 import InterventionCard from '../components/InterventionCard';
 import AlertOverlay from '../components/AlertOverlay';
-import { COLORS, levelColor, levelLabel, Level } from '../utils/colors';
+import AmbientGlow from '../components/AmbientGlow';
+import GlassCard from '../components/GlassCard';
+import { levelColor, levelLabel, Level, ColorTheme } from '../utils/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { humanizeIndicator } from '../utils/formatting';
 
 // TODO: replace with `const { score, loading, refresh } = useBurnoutScore(DEFAULT_USER_ID)` once Rishith's hook lands
@@ -19,6 +24,9 @@ const PLACEHOLDER_SCORE: { score: number; level: Level; intervention: string; to
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = createStyles(colors);
+  const tabBarHeight = useBottomTabBarHeight();
   const [refreshing, setRefreshing] = useState(false);
   const score = PLACEHOLDER_SCORE;
   const [alertVisible, setAlertVisible] = useState(score.level === 'red');
@@ -37,12 +45,26 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <AmbientGlow />
       <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.textDim} />}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 40 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textDim} />}
       >
-        <Text style={styles.wordmark}>PEGASUS</Text>
-        <Text style={styles.subtitle}>your mind's check engine light</Text>
+        <View style={styles.header}>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.wordmark}>PEGASUS</Text>
+            <Text style={styles.subtitle}>your mind's check engine light</Text>
+          </View>
+          <GlassCard style={styles.themeToggle} intensity={40}>
+            <TouchableOpacity style={styles.themeToggleButton} onPress={toggleTheme} hitSlop={8}>
+              <MaterialCommunityIcons
+                name={isDark ? 'weather-night' : 'weather-sunny'}
+                size={18}
+                color={colors.textDim}
+              />
+            </TouchableOpacity>
+          </GlassCard>
+        </View>
 
         <View style={styles.engineWrapper}>
           <CheckEngine score={score.score} level={score.level} />
@@ -58,9 +80,14 @@ export default function HomeScreen() {
 
         <InterventionCard text={score.intervention} />
 
-        <TouchableOpacity style={styles.checkInButton} onPress={() => navigation.navigate('Pulse Check')}>
-          <Text style={styles.checkInButtonText}>Do a 30-second check-in</Text>
-        </TouchableOpacity>
+        <GlassCard style={styles.checkInButton} intensity={40}>
+          <TouchableOpacity
+            style={styles.checkInButtonInner}
+            onPress={() => navigation.navigate('Check-In', { autoStart: Date.now() })}
+          >
+            <Text style={styles.checkInButtonText}>Do a 60-second check-in</Text>
+          </TouchableOpacity>
+        </GlassCard>
       </ScrollView>
 
       {score.level === 'red' && <View style={styles.vignette} pointerEvents="none" />}
@@ -70,35 +97,52 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  content: { alignItems: 'center', padding: 24, paddingTop: 60, paddingBottom: 60 },
-  wordmark: { color: COLORS.text, fontSize: 32, fontWeight: '800', letterSpacing: 4 },
-  subtitle: { color: COLORS.textDim, fontSize: 14, marginTop: 4, marginBottom: 24 },
-  engineWrapper: { marginVertical: 16 },
-  levelLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    marginBottom: 16,
-  },
-  indicators: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  checkInButton: {
-    marginTop: 32,
-    backgroundColor: COLORS.card,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    width: '100%',
-    alignItems: 'center',
-  },
-  checkInButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
-  vignette: {
-    ...StyleSheet.absoluteFillObject,
-    borderColor: 'rgba(239, 68, 68, 0.5)',
-    borderWidth: 12,
-  },
-});
+function createStyles(colors: ColorTheme) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    content: { alignItems: 'center', padding: 24, paddingTop: 60, paddingBottom: 60 },
+    header: { width: '100%', alignItems: 'center' },
+    headerTextWrap: { alignItems: 'center' },
+    themeToggle: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+    },
+    themeToggleButton: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    wordmark: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: 4 },
+    subtitle: { color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 24 },
+    engineWrapper: { marginVertical: 16 },
+    levelLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      letterSpacing: 0.3,
+      marginBottom: 16,
+    },
+    indicators: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+    checkInButton: {
+      marginTop: 32,
+      borderRadius: 999,
+      width: '100%',
+    },
+    checkInButtonInner: {
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      width: '100%',
+      alignItems: 'center',
+    },
+    checkInButtonText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+    vignette: {
+      ...StyleSheet.absoluteFillObject,
+      borderColor: 'rgba(221, 144, 136, 0.3)',
+      borderWidth: 8,
+    },
+  });
+}
